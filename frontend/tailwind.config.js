@@ -2,22 +2,22 @@
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
-    extend: {
-      colors: {
-        primary: {
-          50: "#f5f3ff",
-          100: "#ede9fe",
-          200: "#ddd6fe",
-          300: "#cab5fd",
-          400: "#a78bfa",
-          500: "#8b5cf6",
-          600: "#7c3aed",
-          700: "#6d28d9",
-          800: "#5b21b6",
-          900: "#4c1d95",
-        },
-        accent: "#aa3bff",
+    colors: {
+      // Base colors
+      white: "#ffffff",
+      // Brand colors using CSS variable theme tokens
+      maroon: "var(--color-maroon)",
+      burgundy: "var(--color-burgundy)",
+      gold: "var(--color-gold)",
+      charcoal: "var(--color-charcoal)",
+      slate: {
+        50: "var(--color-slate-50)",
+        100: "var(--color-slate-100)",
+        300: "var(--color-slate-300)",
+        600: "var(--color-slate-600)",
       },
+    },
+    extend: {
       fontFamily: {
         sans: ["Lexend", "system-ui", "sans-serif"],
         heading: ["Lexend", "system-ui", "sans-serif"],

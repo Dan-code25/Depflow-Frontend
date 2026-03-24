@@ -1,5 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
 @import "tailwindcss";
+@theme {
+  --color-maroon: #3A0000;
+  --color-burgundy: #880000;
+  --color-gold: #FFD700;
+  --color-charcoal: #4A4747;
+  --color-slate-50: #F8FAFC;
+  --color-slate-100: #F1F5F9;
+  --color-slate-300: #94A3B8;
+  --color-slate-600: #475569;
+}
 
 @layer base {
   html, body, * {
