@@ -1,15 +1,16 @@
 import { Info } from "lucide-react";
+
 import school from "../../assets/school-tup.webp";
 import tupLogo from "../../assets/tup-logo.svg";
 import appLogo from "../../assets/logo.png";
 import google from "../../assets/google.png";
 
-export default function Login() {
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth login
-    console.log("Google login clicked");
-  };
+import { useGoogleAuth } from "../../hooks/useGoogleAuth";
 
+export default function Login() {
+
+  const { loginWithGoogle, error, setError } = useGoogleAuth();
+  
   return (
     <div className="flex flex-col lg:flex-row min-h-screen">
       {/* Left Panel */}
@@ -71,12 +72,26 @@ export default function Login() {
           {/* Sign In Section */}
           <div className="space-y-4">
             <button
-              onClick={handleGoogleLogin}
+              onClick={() => loginWithGoogle()}
               className="w-full flex items-center justify-center gap-3 sm:gap-4 bg-burgundy text-white font-semibold border-2 border-burgundy rounded-[24px] py-4 sm:py-5 px-6 sm:px-8 cursor-pointer text-sm sm:text-base transition-all duration-200 hover:bg-white hover:text-burgundy hover:shadow-lg transform hover:scale-105 active:scale-95"
             >
               <img src={google} alt="google" className="w-5 sm:w-6" />
               <span>Continue with TUP email</span>
             </button>
+
+            {error && (
+              <div className="flex gap-3 w-full py-3 px-4 bg-red-50 border border-red-300 rounded-[16px] animate-in fade-in">
+                <p className="text-xs sm:text-sm text-red-700 leading-relaxed flex-1">
+                  {error}
+                </p>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-red-500 hover:text-red-700 font-semibold text-lg leading-none"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Info Section */}
@@ -88,8 +103,9 @@ export default function Login() {
               />
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                 Use your institutional{" "}
-                <span className="text-burgundy font-semibold">@tup.edu.ph</span> account to sign
-                in. Access is restricted to authorized faculty only.
+                <span className="text-burgundy font-semibold">@tup.edu.ph</span>{" "}
+                account to sign in. Access is restricted to authorized faculty
+                only.
               </p>
             </div>
           </div>
