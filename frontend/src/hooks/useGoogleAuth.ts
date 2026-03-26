@@ -23,12 +23,12 @@ export const useGoogleAuth = () => {
 
         console.log(data);
 
-        localStorage.setItem("user_info", JSON.stringify(data.userInfo));
+        localStorage.setItem("user_role", data.userInfo.role);
 
         if(data.userInfo.role === "admin") {
-          console.log('you are an admin');
+          navigate("/admin/dashboard");
         } else {
-          console.log('you are a faculty member');
+          navigate("/faculty/dashboard");
         }
       } catch (error) {
         console.error("Google login error:", error);
