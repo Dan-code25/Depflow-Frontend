@@ -9,6 +9,8 @@
   --color-slate-100: #F1F5F9;
   --color-slate-300: #94A3B8;
   --color-slate-600: #475569;
+
+  --color-active: #FEF2F2
 }
 
 @layer base {

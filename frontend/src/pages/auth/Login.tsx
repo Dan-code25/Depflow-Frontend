@@ -6,10 +6,11 @@ import appLogo from "../../assets/logo.png";
 import google from "../../assets/google.png";
 
 import { useGoogleAuth } from "../../hooks/useGoogleAuth";
+import { LoadingSpinner } from "../../components/common/LoadingSpinner";
 
 export default function Login() {
 
-  const { loginWithGoogle, error, setError } = useGoogleAuth();
+  const { loginWithGoogle, error, setError, isLoading } = useGoogleAuth();
   
   return (
     <div className="flex flex-col lg:flex-row min-h-screen">
@@ -73,10 +74,17 @@ export default function Login() {
           <div className="space-y-4">
             <button
               onClick={() => loginWithGoogle()}
-              className="w-full flex items-center justify-center gap-3 sm:gap-4 bg-burgundy text-white font-semibold border-2 border-burgundy rounded-[24px] py-4 sm:py-5 px-6 sm:px-8 cursor-pointer text-sm sm:text-base transition-all duration-200 hover:bg-white hover:text-burgundy hover:shadow-lg transform hover:scale-105 active:scale-95"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-3 sm:gap-4 bg-burgundy text-white font-semibold border-2 border-burgundy rounded-[24px] py-4 sm:py-5 px-6 sm:px-8 cursor-pointer text-sm sm:text-base transition-all duration-200 hover:bg-white hover:text-burgundy hover:shadow-lg transform hover:scale-105 active:scale-95 disabled:opacity-75 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              <img src={google} alt="google" className="w-5 sm:w-6" />
-              <span>Continue with TUP email</span>
+              {isLoading ? (
+                <LoadingSpinner size="sm" color="white" />
+              ) : (
+                <>
+                  <img src={google} alt="google" className="w-5 sm:w-6" />
+                  <span>Continue with TUP email</span>
+                </>
+              )}
             </button>
 
             {error && (
