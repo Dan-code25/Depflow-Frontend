@@ -6,6 +6,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import FacultyDashboard from "./components/faculty/FacultyDashboard";
+import MyProfile from "./pages/profile/MyProfile";
 
 
 const cliendId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -19,10 +20,12 @@ function App() {
 
           <Route element={<ProtectedRoute requiredRole="admin" />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/profile" element={<MyProfile />} />
           </Route>
           
           <Route element={<ProtectedRoute requiredRole="faculty" />}>
             <Route path="/faculty/dashboard" element={<FacultyDashboard />} />
+            <Route path="/faculty/profile" element={<MyProfile />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
