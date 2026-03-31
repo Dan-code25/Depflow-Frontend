@@ -2,7 +2,9 @@ interface FormFieldProps {
   label: string;
   name: string;
   value: string | number;
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  onChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => void;
   type?: string;
   placeholder?: string;
   isReadOnly?: boolean;
@@ -35,7 +37,9 @@ export default function FormField({
           onChange={onChange}
           className="w-full px-3 py-2 text-sm sm:text-base border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
         >
-          {!value && <option value="">{placeholder || "Select an option"}</option>}
+          {!value && (
+            <option value="">{placeholder || "Select an option"}</option>
+          )}
           {options.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}

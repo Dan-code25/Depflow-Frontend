@@ -15,3 +15,12 @@ export interface ProfileData {
   title: string;
   profilePicture?: string; // Base64 or image URL
 }
+
+export interface Education {
+  edId?: string;
+  degreeLevel: string;
+  degreeType: string;
+  major: string;
+  university: string;
+  yearGraduated: number;
+}

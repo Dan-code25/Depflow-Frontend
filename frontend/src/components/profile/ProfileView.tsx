@@ -1,10 +1,15 @@
 import type { ProfileData } from "../../types/profile";
+import type { Education } from "../../types/profile";
 import { Edit2 } from "lucide-react";
+import EducationTab from "./EducationTab";
 
 interface ProfileViewProps {
   data: ProfileData;
   activeTab: string;
   onEdit?: () => void;
+  educations?: Education[];
+  onAddEducation?: (education: Education) => void;
+  onDeleteEducation?: (id: string | undefined) => void;
 }
 
 const InfoField = ({ label, value }: { label: string; value: string }) => (
@@ -43,7 +48,20 @@ export default function ProfileView({
   data,
   activeTab,
   onEdit,
+  educations = [],
+  onAddEducation,
+  onDeleteEducation,
 }: ProfileViewProps) {
+  if (activeTab === "education") {
+    return (
+      <EducationTab
+        educations={educations}
+        onAdd={onAddEducation || (() => {})}
+        onDelete={onDeleteEducation || (() => {})}
+      />
+    );
+  }
+
   if (activeTab !== "personal") {
     return (
       <div className="bg-white rounded-lg p-6 sm:p-8 text-center text-slate-500 text-sm sm:text-base">

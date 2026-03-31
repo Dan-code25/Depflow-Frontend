@@ -6,7 +6,7 @@ import ProfileSidebar from "../../components/profile/ProfileSidebar";
 import ProfileTabs from "../../components/profile/ProfileTabs";
 import ProfileView from "../../components/profile/ProfileView";
 import ProfileEdit from "../../components/profile/ProfileEdit";
-import type { ProfileData } from "../../types/profile";
+import type { ProfileData, Education } from "../../types/profile";
 
 import {
   getPersonalInfo,
@@ -14,6 +14,7 @@ import {
   updatePersonalInfo,
   updateProfilePicture,
 } from "../../services/profileService";
+import { addEducation, getEducations, deleteEducation } from "../../services/educationService";
 
 export default function MyProfile() {
   const [isEditing, setIsEditing] = useState(false);
@@ -34,6 +35,14 @@ export default function MyProfile() {
     title: "",
     age: undefined,
   });
+  const [educations, setEducations] = useState<Education[]>([]);
+
+  const handleTabChange = (tab: string) => {
+    if (isEditing) {
+      setIsEditing(false);
+    }
+    setActiveTab(tab);
+  };
 
   const handleEdit = () => setIsEditing(true);
   const handleCancel = () => setIsEditing(false);
@@ -43,6 +52,27 @@ export default function MyProfile() {
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to save profile data:", error);
+    }
+  };
+
+  const handleAddEducation = (education: Education) => {
+    const newEducation = {
+      ...education,
+      edId: Date.now().toString(),
+    };
+
+    addEducation(newEducation);
+
+    setEducations([...educations, newEducation]);
+  };
+
+  const handleDeleteEducation = async (id: string | undefined) => {
+    try {
+      if (!id) return;
+      await deleteEducation(id);
+      setEducations((prev) => prev.filter((edu) => edu.edId !== id));
+    } catch (error) {
+      console.error("Failed to delete education:", error);
     }
   };
 
@@ -115,6 +145,18 @@ export default function MyProfile() {
     }
   };
 
+  useEffect(() => {
+    const fetchEducations = async () => {
+      try {
+        const educationData = await getEducations();
+        setEducations(educationData);
+      } catch (error) {
+        console.error("Failed to fetch education data:", error);
+      }
+    };
+    fetchEducations();
+  }, []);
+
   return (
     <Layout>
       <div className="container-main flex flex-col gap-4 sm:gap-6">
@@ -127,7 +169,7 @@ export default function MyProfile() {
           />
 
           <div className="lg:col-span-3">
-            <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            <ProfileTabs activeTab={activeTab} onTabChange={handleTabChange} />
 
             {isEditing ? (
               <ProfileEdit
@@ -141,6 +183,9 @@ export default function MyProfile() {
                 data={profileData}
                 activeTab={activeTab}
                 onEdit={handleEdit}
+                educations={educations}
+                onAddEducation={handleAddEducation}
+                onDeleteEducation={handleDeleteEducation}
               />
             )}
           </div>

@@ -1,5 +1,4 @@
-
-import type { ProfileData } from "../types/profile";
+import type { ProfileData} from "../types/profile";
 import api from "./api";
 
 export const getPersonalInfo = async () => {
@@ -36,8 +35,7 @@ export const getProfilePicture = async () => {
     const response = await api.get("/profile/profile-picture");
     console.log("Fetched profile picture:", response.data);
 
-    return response.data.photoUrl; 
-
+    return response.data.photoUrl;
   } catch (error) {
     console.error("Error fetching profile picture:", error);
     throw error;
