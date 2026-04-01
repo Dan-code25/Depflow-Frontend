@@ -1,7 +1,14 @@
-import type { ProfileData, Education, Credential, CredentialType } from "../../types/profile";
+import type {
+  ProfileData,
+  Education,
+  Credential,
+  CredentialType,
+  Research,
+} from "../../types/profile";
 import { Edit2 } from "lucide-react";
 import EducationTab from "./EducationTab";
 import CredentialsTab from "./CredentialsTab";
+import ResearchTab from "./ResearchTab";
 
 interface ProfileViewProps {
   data: ProfileData;
@@ -13,6 +20,9 @@ interface ProfileViewProps {
   credentials?: Credential[];
   onAddCredential?: (credential: Credential, type: CredentialType) => void;
   onDeleteCredential?: (id: string | undefined, type: CredentialType) => void;
+  researches?: Research[];
+  onAddResearch?: (research: Research) => void;
+  onDeleteResearch?: (id: string | undefined) => void;
 }
 
 const InfoField = ({ label, value }: { label: string; value: string }) => (
@@ -57,6 +67,9 @@ export default function ProfileView({
   credentials = [],
   onAddCredential,
   onDeleteCredential,
+  researches = [],
+  onAddResearch,
+  onDeleteResearch,
 }: ProfileViewProps) {
   if (activeTab === "education") {
     return (
@@ -78,11 +91,13 @@ export default function ProfileView({
     );
   }
 
-  if (activeTab !== "personal") {
+  if (activeTab === "research") {
     return (
-      <div className="bg-white rounded-lg p-6 sm:p-8 text-center text-slate-500 text-sm sm:text-base">
-        This tab is not yet configured.
-      </div>
+      <ResearchTab
+        researches={researches}
+        onAdd={onAddResearch || (() => {})}
+        onDelete={onDeleteResearch || (() => {})}
+      />
     );
   }
 

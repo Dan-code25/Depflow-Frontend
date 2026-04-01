@@ -23,27 +23,32 @@ const getCredentialIcon = (type: string) => {
   }
 };
 
-const getDetailLines = (credential: Credential): string[] => {
+const getDetailLines = (
+  credential: Credential,
+): { label: string; value: string }[] => {
   switch (credential.type) {
     case "certification":
       return [
-        `Organization: ${credential.organization}`,
-        `Year: ${credential.yearObtained}`,
+        { label: "Organization:", value: credential.organization || "" },
+        { label: "Year:", value: credential.yearObtained?.toString() || "" },
       ];
     case "license":
       return [
-        `Authority: ${credential.issuingAuthority}`,
-        `Year: ${credential.yearObtained}`,
+        { label: "Authority:", value: credential.issuingAuthority || "" },
+        { label: "Year:", value: credential.yearObtained?.toString() || "" },
       ];
     case "seminar":
       return [
-        `Organizer: ${credential.organizer}`,
-        `Year: ${credential.yearObtained}`,
+        { label: "Organizer:", value: credential.organizer || "" },
+        { label: "Year:", value: credential.yearObtained?.toString() || "" },
       ];
     case "experience":
       return [
-        `${credential.company}`,
-        `${credential.startYear}${credential.endYear ? ` - ${credential.isCurrentlyWorking ? "Present" : credential.endYear}` : " - Present"}`,
+        { label: "Company:", value: credential.company || "" },
+        {
+          label: "Period:",
+          value: `${credential.startYear}${credential.endYear ? ` - ${credential.isCurrentlyWorking ? "Present" : credential.endYear}` : " - Present"}`,
+        },
       ];
     default:
       return [];
@@ -95,7 +100,10 @@ export default function CredentialCard({
                     key={idx}
                     className="text-xs sm:text-sm text-slate-600 break-words"
                   >
-                    {detail}
+                    <span className="font-semibold text-slate-700">
+                      {detail.label}
+                    </span>{" "}
+                    {detail.value}
                   </p>
                 ))}
               </div>

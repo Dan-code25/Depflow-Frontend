@@ -6,7 +6,7 @@ import ProfileSidebar from "../../components/profile/ProfileSidebar";
 import ProfileTabs from "../../components/profile/ProfileTabs";
 import ProfileView from "../../components/profile/ProfileView";
 import ProfileEdit from "../../components/profile/ProfileEdit";
-import type { ProfileData, Education, Credential } from "../../types/profile";
+import type { ProfileData, Education, Credential, Research } from "../../types/profile";
 
 import {
   getPersonalInfo,
@@ -30,6 +30,11 @@ import {
   deleteExperience,
   getCredentials,
 } from "../../services/credentialsService";
+import {
+  addResearch,
+  getResearch,
+  deleteResearch,
+} from "../../services/researchService";
 
 export default function MyProfile() {
   const [isEditing, setIsEditing] = useState(false);
@@ -52,6 +57,7 @@ export default function MyProfile() {
   });
   const [educations, setEducations] = useState<Education[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [researches, setResearches] = useState<Research[]>([]);
 
   const handleTabChange = (tab: string) => {
     if (isEditing) {
@@ -222,6 +228,65 @@ export default function MyProfile() {
     }
   };
 
+  const handleAddResearch = async (research: Research) => {
+    // Generate ID immediately (optimistic rendering)
+    const optimisticId = Date.now().toString();
+
+    try {
+      const optimisticResearch = {
+        ...research,
+        researchId: optimisticId,
+      };
+
+      // Add to state immediately (user sees card)
+      setResearches([...researches, optimisticResearch]);
+
+      // Send to backend in background
+      const response = await addResearch(research);
+
+      // Replace with backend response when available
+      if (response) {
+        const backendResearch: Research = {
+          researchId: response.res_id?.toString(),
+          title: response.title,
+          journalConference: response.journal_conference,
+          type: response.research_type,
+          year: response.published_year,
+        };
+
+        setResearches((prev) =>
+          prev.map((r) => (r.researchId === optimisticId ? backendResearch : r)),
+        );
+      }
+    } catch (error) {
+      // On error, remove optimistic research
+      setResearches((prev) => prev.filter((r) => r.researchId !== optimisticId));
+      console.error("Failed to add research:", error);
+    }
+  };
+
+  const handleDeleteResearch = async (id: string | undefined) => {
+    if (!id) return;
+
+    try {
+      // Store the research in case we need to restore it
+      const deletedResearch = researches.find((r) => r.researchId === id);
+
+      // Remove from state immediately (optimistic)
+      setResearches((prev) => prev.filter((r) => r.researchId !== id));
+
+      // Send delete request to backend
+      await deleteResearch(id);
+    } catch (error) {
+      // On error, restore the research
+      const deletedResearch = researches.find((r) => r.researchId === id);
+      if (deletedResearch) {
+        setResearches((prev) => [...prev, deletedResearch]);
+      }
+      console.error("Failed to delete research:", error);
+    }
+  };
+
   const userRole = localStorage.getItem("user_role");
   const Layout = userRole === "admin" ? AdminLayout : FacultyLayout;
 
@@ -315,6 +380,18 @@ export default function MyProfile() {
     fetchCredentials();
   }, []);
 
+  useEffect(() => {
+    const fetchResearchData = async () => {
+      try {
+        const researchData = await getResearch();
+        setResearches(researchData);
+      } catch (error) {
+        console.error("Failed to fetch research data:", error);
+      }
+    };
+    fetchResearchData();
+  }, []);
+
   return (
     <Layout>
       <div className="container-main flex flex-col gap-4 sm:gap-6">
@@ -347,6 +424,9 @@ export default function MyProfile() {
                 credentials={credentials}
                 onAddCredential={handleAddCredential}
                 onDeleteCredential={handleDeleteCredential}
+                researches={researches}
+                onAddResearch={handleAddResearch}
+                onDeleteResearch={handleDeleteResearch}
               />
             )}
           </div>

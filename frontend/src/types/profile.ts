@@ -48,3 +48,11 @@ export interface Credential {
   startYear?: number;
   endYear?: number;
 }
+
+export interface Research {
+  researchId?: string;
+  title: string;
+  journalConference: string;
+  type: "Journal" | "Conference" | "Thesis/Dissertation" | "Book/Chapter" | "Patent" | "Technical Report" | "Policy Brief" | "Research Project";
+  year: number;
+}
