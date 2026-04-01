@@ -10,6 +10,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { ConfirmDialog } from "../common/ConfirmDialog";
+import { useLogout } from "../../hooks/useLogout";
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -21,6 +22,7 @@ export function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const location = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const logoutUser = useLogout();
 
   const navItems = [
     { label: "Dashboard", icon: Home, path: "/admin/dashboard" },
@@ -42,8 +44,7 @@ export function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
 
   const handleConfirmLogout = () => {
     setIsLoggingOut(true);
-    localStorage.clear();
-    navigate("/");
+    logoutUser.logout();
   };
 
   return (

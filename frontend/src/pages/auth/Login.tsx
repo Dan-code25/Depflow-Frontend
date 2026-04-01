@@ -1,4 +1,6 @@
 import { Info } from "lucide-react";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 import school from "../../assets/school-tup.webp";
 import tupLogo from "../../assets/tup-logo.svg";
@@ -9,9 +11,20 @@ import { useGoogleAuth } from "../../hooks/useGoogleAuth";
 import { LoadingSpinner } from "../../components/common/LoadingSpinner";
 
 export default function Login() {
-
+  const navigate = useNavigate();
   const { loginWithGoogle, error, setError, isLoading } = useGoogleAuth();
-  
+
+  useEffect(() => {
+    // If user is already logged in, redirect to dashboard
+    const userRole = localStorage.getItem("user_role");
+    if (userRole) {
+      navigate(
+        userRole === "admin" ? "/admin/dashboard" : "/faculty/dashboard",
+        { replace: true }
+      );
+    }
+  }, [navigate]);
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen">
       {/* Left Panel */}

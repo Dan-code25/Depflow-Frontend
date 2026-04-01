@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Home, User, LogOut } from "lucide-react";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 
+import { useLogout } from "../../hooks/useLogout";
+
 interface FacultySidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -16,6 +18,7 @@ export function FacultySidebar({
   const location = useLocation();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const logoutUser = useLogout();
 
   const navItems = [
     { label: "Dashboard", icon: Home, path: "/faculty/dashboard" },
@@ -33,8 +36,7 @@ export function FacultySidebar({
 
   const handleConfirmLogout = () => {
     setIsLoggingOut(true);
-    localStorage.clear();
-    navigate("/");
+    logoutUser.logout();
   };
 
   return (

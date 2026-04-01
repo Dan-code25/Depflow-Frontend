@@ -59,10 +59,10 @@ export default function EducationCard({
                 {education.university}
               </p>
               <p className="text-xs sm:text-sm mt-2">
-                <span className="font-semibold text-slate-700">
-                  Graduated:
-                </span>{" "}
-                <span className="text-slate-600">{education.yearGraduated}</span>
+                <span className="font-semibold text-slate-700">Graduated:</span>{" "}
+                <span className="text-slate-600">
+                  {education.yearGraduated}
+                </span>
               </p>
             </div>
           </div>

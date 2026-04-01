@@ -28,15 +28,18 @@ export const useGoogleAuth = () => {
         const email = data.user.email;
 
         if (!email.endsWith("@tup.edu.ph")) {
-          setError("Please use your @tup.edu.ph institutional email to sign in.");
+          setError(
+            "Please use your @tup.edu.ph institutional email to sign in.",
+          );
           setIsLoading(false);
           return;
         }
 
+        // Store auth data (JWT is handled by httpOnly cookie)
         localStorage.setItem("user_role", data.userInfo.role);
         localStorage.setItem("user_info", JSON.stringify(data.user));
 
-        if(data.userInfo.role === "admin") {
+        if (data.userInfo.role === "admin") {
           navigate("/admin/dashboard");
         } else {
           navigate("/faculty/dashboard");
@@ -44,7 +47,11 @@ export const useGoogleAuth = () => {
       } catch (error) {
         setIsLoading(false);
         console.error("Google login error:", error);
-        setError(error instanceof Error ? error.message : "An unknown error occurred during Google login.");
+        setError(
+          error instanceof Error
+            ? error.message
+            : "An unknown error occurred during Google login.",
+        );
       }
     },
     onError: () => {
