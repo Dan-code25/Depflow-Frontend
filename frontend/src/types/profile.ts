@@ -56,3 +56,19 @@ export interface Research {
   type: "Journal" | "Conference" | "Thesis/Dissertation" | "Book/Chapter" | "Patent" | "Technical Report" | "Policy Brief" | "Research Project";
   year: number;
 }
+
+export interface Announcement {
+  id?: string;
+  title: string;
+  content: string;
+  createdBy?: string;
+  firstName?: string;
+  lastName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  attachments?: Array<{
+    id?: string;
+    filename: string;
+    url: string;
+  }>;
+}

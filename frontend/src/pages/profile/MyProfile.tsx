@@ -394,41 +394,47 @@ export default function MyProfile() {
 
   return (
     <Layout>
-      <div className="container-main flex flex-col gap-4 sm:gap-6">
-        <ProfileHeader />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="container-main">
+          <ProfileHeader />
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
-          <ProfileSidebar
-            data={profileData}
-            onProfilePictureChange={handleProfilePictureChange}
-          />
-
-          <div className="lg:col-span-3">
-            <ProfileTabs activeTab={activeTab} onTabChange={handleTabChange} />
-
-            {isEditing ? (
-              <ProfileEdit
+        <div className="container-main flex flex-col gap-6 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 w-full">
+            <div className="lg:col-span-1">
+              <ProfileSidebar
                 data={profileData}
-                onChange={setProfileData}
-                onSave={handleSave}
-                onCancel={handleCancel}
+                onProfilePictureChange={handleProfilePictureChange}
               />
-            ) : (
-              <ProfileView
-                data={profileData}
-                activeTab={activeTab}
-                onEdit={handleEdit}
-                educations={educations}
-                onAddEducation={handleAddEducation}
-                onDeleteEducation={handleDeleteEducation}
-                credentials={credentials}
-                onAddCredential={handleAddCredential}
-                onDeleteCredential={handleDeleteCredential}
-                researches={researches}
-                onAddResearch={handleAddResearch}
-                onDeleteResearch={handleDeleteResearch}
-              />
-            )}
+            </div>
+
+            <div className="lg:col-span-4">
+              <ProfileTabs activeTab={activeTab} onTabChange={handleTabChange} />
+
+              {isEditing ? (
+                <ProfileEdit
+                  data={profileData}
+                  onChange={setProfileData}
+                  onSave={handleSave}
+                  onCancel={handleCancel}
+                />
+              ) : (
+                <ProfileView
+                  data={profileData}
+                  activeTab={activeTab}
+                  onEdit={handleEdit}
+                  educations={educations}
+                  onAddEducation={handleAddEducation}
+                  onDeleteEducation={handleDeleteEducation}
+                  credentials={credentials}
+                  onAddCredential={handleAddCredential}
+                  onDeleteCredential={handleDeleteCredential}
+                  researches={researches}
+                  onAddResearch={handleAddResearch}
+                  onDeleteResearch={handleDeleteResearch}
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>

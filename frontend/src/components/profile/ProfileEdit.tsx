@@ -16,11 +16,11 @@ const Section = ({
   title: string;
   children: React.ReactNode;
 }) => (
-  <div className="mb-6">
-    <h3 className="text-xs sm:text-sm font-bold text-burgundy uppercase mb-4">
+  <div className="pb-8 border-b border-slate-200 last:pb-0 last:border-0">
+    <h3 className="text-xs sm:text-sm font-bold text-burgundy uppercase mb-5 tracking-wide">
       {title}
     </h3>
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
       {children}
     </div>
   </div>
@@ -73,7 +73,7 @@ export default function ProfileEdit({
   const canEditEmployment = isAdmin;
 
   return (
-    <div className="bg-white rounded-lg p-6 sm:p-8 space-y-6">
+    <div className="bg-white rounded-lg p-8 space-y-8 shadow-md border border-slate-200">
       <Section title="Basic Information">
         <FormField
           label="First Name"
@@ -184,17 +184,17 @@ export default function ProfileEdit({
         />
       </Section>
 
-      <div className="flex gap-3 pt-4">
+      <div className="flex gap-3 pt-6 border-t border-slate-200">
         <button
           onClick={onCancel}
-          className="px-4 py-2 text-slate-600 hover:text-slate-800 transition flex items-center gap-2"
+          className="px-5 py-2.5 text-slate-700 hover:text-charcoal hover:bg-slate-100 rounded-lg transition-all duration-200 font-semibold flex items-center gap-2"
         >
           <X size={18} />
           <span>Cancel</span>
         </button>
         <button
           onClick={onSave}
-          className="px-4 py-2 bg-burgundy text-white rounded hover:bg-opacity-90 transition flex items-center gap-2"
+          className="px-6 py-2.5 bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white rounded-lg transition-all duration-200 font-semibold flex items-center gap-2 shadow-md hover:shadow-lg"
         >
           <Save size={18} />
           <span>Save Changes</span>

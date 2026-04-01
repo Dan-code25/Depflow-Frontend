@@ -8,6 +8,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import FacultyDashboard from "./components/faculty/FacultyDashboard";
 import MyProfile from "./pages/profile/MyProfile";
+import AdminAnnouncementsPage from "./pages/admin/AdminAnnouncementsPage";
+import FacultyAnnouncementsPage from "./pages/faculty/FacultyAnnouncementsPage";
 import { LoadingSpinner } from "./components/common/LoadingSpinner";
 
 const cliendId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -30,11 +32,13 @@ function AppRoutes() {
       <Route element={<ProtectedRoute requiredRole="admin" />}>
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/profile" element={<MyProfile />} />
+        <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="faculty" />}>
         <Route path="/faculty/dashboard" element={<FacultyDashboard />} />
         <Route path="/faculty/profile" element={<MyProfile />} />
+        <Route path="/faculty/announcements" element={<FacultyAnnouncementsPage />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />
