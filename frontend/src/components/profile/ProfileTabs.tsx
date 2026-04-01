@@ -12,7 +12,10 @@ const TABS = [
   { id: "research", label: "Research", Icon: BookOpen },
 ];
 
-export default function ProfileTabs({ activeTab, onTabChange }: ProfileTabsProps) {
+export default function ProfileTabs({
+  activeTab,
+  onTabChange,
+}: ProfileTabsProps) {
   return (
     <div className="flex flex-wrap gap-2 mb-6 bg-white rounded-lg p-2 sm:p-4 shadow-md border border-slate-200">
       {TABS.map((tab) => (

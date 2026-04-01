@@ -11,7 +11,6 @@ export default function ProfileSidebar({
   data,
   onProfilePictureChange,
 }: ProfileSidebarProps) {
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onProfilePictureChange) {
@@ -46,7 +45,9 @@ export default function ProfileSidebar({
           <h2 className="text-lg sm:text-xl font-bold text-center mt-4 text-charcoal">
             {data.firstName} {data.lastName}
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">{data.title}</p>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+            {data.title}
+          </p>
         </div>
 
         {/* Contact Info Section */}
@@ -59,13 +60,17 @@ export default function ProfileSidebar({
               <div className="w-8 h-8 rounded-lg bg-burgundy/10 flex items-center justify-center flex-shrink-0">
                 <Mail size={16} className="text-burgundy" />
               </div>
-              <span className="text-slate-700 truncate font-medium">{data.email}</span>
+              <span className="text-slate-700 truncate font-medium">
+                {data.email}
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-burgundy/10 flex items-center justify-center flex-shrink-0">
                 <Phone size={16} className="text-burgundy" />
               </div>
-              <span className="text-slate-700 truncate font-medium">{data.contactNumber}</span>
+              <span className="text-slate-700 truncate font-medium">
+                {data.contactNumber}
+              </span>
             </div>
           </div>
         </div>
@@ -80,7 +85,9 @@ export default function ProfileSidebar({
               <div className="w-8 h-8 rounded-lg bg-burgundy/10 flex items-center justify-center flex-shrink-0">
                 <Briefcase size={16} className="text-burgundy" />
               </div>
-              <span className="text-slate-700 truncate font-medium">{data.employeeId}</span>
+              <span className="text-slate-700 truncate font-medium">
+                {data.employeeId}
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-burgundy/10 flex items-center justify-center flex-shrink-0">
