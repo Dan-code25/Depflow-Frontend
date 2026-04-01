@@ -26,8 +26,7 @@ export const getEducations = async () => {
 export const deleteEducation = async (id: string) => {
   try {
     console.log("Deleting education with ID:", id);
-    const response = await api.delete(`/education/delete/${id}`);
-
+    await api.delete(`/education/delete/${id}`);
   } catch (error) {
     console.error("Error deleting education:", error);
     throw error;

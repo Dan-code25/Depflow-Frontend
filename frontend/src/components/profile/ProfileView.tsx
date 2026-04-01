@@ -1,7 +1,7 @@
-import type { ProfileData } from "../../types/profile";
-import type { Education } from "../../types/profile";
+import type { ProfileData, Education, Credential, CredentialType } from "../../types/profile";
 import { Edit2 } from "lucide-react";
 import EducationTab from "./EducationTab";
+import CredentialsTab from "./CredentialsTab";
 
 interface ProfileViewProps {
   data: ProfileData;
@@ -10,6 +10,9 @@ interface ProfileViewProps {
   educations?: Education[];
   onAddEducation?: (education: Education) => void;
   onDeleteEducation?: (id: string | undefined) => void;
+  credentials?: Credential[];
+  onAddCredential?: (credential: Credential, type: CredentialType) => void;
+  onDeleteCredential?: (id: string | undefined, type: CredentialType) => void;
 }
 
 const InfoField = ({ label, value }: { label: string; value: string }) => (
@@ -51,6 +54,9 @@ export default function ProfileView({
   educations = [],
   onAddEducation,
   onDeleteEducation,
+  credentials = [],
+  onAddCredential,
+  onDeleteCredential,
 }: ProfileViewProps) {
   if (activeTab === "education") {
     return (
@@ -58,6 +64,16 @@ export default function ProfileView({
         educations={educations}
         onAdd={onAddEducation || (() => {})}
         onDelete={onDeleteEducation || (() => {})}
+      />
+    );
+  }
+
+  if (activeTab === "credentials") {
+    return (
+      <CredentialsTab
+        credentials={credentials}
+        onAdd={onAddCredential || (() => {})}
+        onDelete={onDeleteCredential || (() => {})}
       />
     );
   }

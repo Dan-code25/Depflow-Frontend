@@ -1,6 +1,7 @@
 import { useState } from "react";
 import EducationCard from "./EducationCard";
 import EducationModal from "./EducationModal";
+import AddButton from "../common/AddButton";
 import type { Education } from "../../types/profile";
 
 interface EducationTabProps {
@@ -44,12 +45,10 @@ export default function EducationTab({
         )}
       </div>
 
-      <button
+      <AddButton
+        label="Add Education"
         onClick={() => setIsModalOpen(true)}
-        className="w-full py-2 sm:py-3 border border-dashed border-slate-300 rounded text-burgundy font-semibold hover:bg-slate-50 transition flex items-center justify-center gap-2 cursor-pointer text-xs sm:text-sm"
-      >
-        <span className="text-base sm:text-lg">+</span> Add Education
-      </button>
+      />
 
       <EducationModal
         isOpen={isModalOpen}

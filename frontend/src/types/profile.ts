@@ -24,3 +24,27 @@ export interface Education {
   university: string;
   yearGraduated: number;
 }
+
+export type CredentialType =
+  | "certification"
+  | "license"
+  | "seminar"
+  | "experience";
+
+export interface Credential {
+  id?: string;
+  type: CredentialType;
+  // Common fields
+  title: string;
+  yearObtained?: number;
+  // Certification fields
+  organization?: string;
+  // License fields
+  issuingAuthority?: string;
+  // Seminar fields
+  organizer?: string;
+  // Work experience fields
+  company?: string;
+  startYear?: number;
+  endYear?: number;
+}
