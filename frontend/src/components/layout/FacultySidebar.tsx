@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Home, User, LogOut, Megaphone } from "lucide-react";
+import { Home, User, LogOut, Megaphone, Briefcase } from "lucide-react";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 
 import { useLogout } from "../../hooks/useLogout";
@@ -23,6 +23,11 @@ export function FacultySidebar({
   const navItems = [
     { label: "Dashboard", icon: Home, path: "/faculty/dashboard" },
     { label: "Announcements", icon: Megaphone, path: "/faculty/announcements" },
+    {
+      label: "Faculty Information",
+      icon: Briefcase,
+      path: "/faculty/information",
+    },
     { label: "My Profile", icon: User, path: "/faculty/profile" },
   ];
 
