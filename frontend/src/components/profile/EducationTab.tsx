@@ -6,20 +6,21 @@ import type { Education } from "../../types/profile";
 
 interface EducationTabProps {
   educations: Education[];
-  onAdd: (education: Education) => void;
-  onDelete: (id: string | undefined) => void;
+  onAdd?: (education: Education) => void;
+  onDelete?: (id: string | undefined) => void;
+  readOnly?: boolean;
 }
 
 export default function EducationTab({
   educations,
   onAdd,
   onDelete,
+  readOnly = false,
 }: EducationTabProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-
   const handleSubmit = (education: Education) => {
-    onAdd(education);
+    onAdd?.(education);
     setIsModalOpen(false);
   };
 
@@ -39,22 +40,26 @@ export default function EducationTab({
             <EducationCard
               key={education.edId}
               education={education}
-              onDelete={onDelete}
+              onDelete={!readOnly ? onDelete : undefined}
             />
           ))
         )}
       </div>
 
-      <AddButton
-        label="Add Education"
-        onClick={() => setIsModalOpen(true)}
-      />
+      {!readOnly && onAdd && (
+        <>
+          <AddButton
+            label="Add Education"
+            onClick={() => setIsModalOpen(true)}
+          />
 
-      <EducationModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmit}
-      />
+          <EducationModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onSubmit={handleSubmit}
+          />
+        </>
+      )}
     </div>
   );
 }

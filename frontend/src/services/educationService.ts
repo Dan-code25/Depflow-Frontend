@@ -23,6 +23,19 @@ export const getEducations = async () => {
   }
 };
 
+// Fetch education for a specific faculty member
+export const getFacultyEducations = async (facultyId: string) => {
+  try {
+    const response = await api.get(
+      `/faculty-information/education/faculty/${facultyId}`,
+    );
+    return response.data || [];
+  } catch (error) {
+    console.error("Error fetching faculty education:", error);
+    throw error;
+  }
+};
+
 export const deleteEducation = async (id: string) => {
   try {
     console.log("Deleting education with ID:", id);
@@ -32,4 +45,3 @@ export const deleteEducation = async (id: string) => {
     throw error;
   }
 };
-

@@ -5,11 +5,13 @@ import profilePlaceholder from "../../assets/profile-placeholder.svg";
 interface ProfileSidebarProps {
   data: ProfileData;
   onProfilePictureChange?: (file: File) => void;
+  readOnly?: boolean;
 }
 
 export default function ProfileSidebar({
   data,
   onProfilePictureChange,
+  readOnly = false,
 }: ProfileSidebarProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -30,7 +32,7 @@ export default function ProfileSidebar({
               alt="Profile"
               className="w-24 h-24 sm:w-28 sm:h-28 rounded-full flex-shrink-0 border-4 border-white object-cover shadow-lg"
             />
-            {
+            {!readOnly && (
               <label className="absolute bottom-0 right-0 bg-burgundy text-white p-2.5 rounded-full cursor-pointer hover:bg-burgundy/90 transition-all shadow-md hover:shadow-lg group">
                 <Camera size={18} />
                 <input
@@ -40,7 +42,7 @@ export default function ProfileSidebar({
                   className="hidden"
                 />
               </label>
-            }
+            )}
           </div>
           <h2 className="text-lg sm:text-xl font-bold text-center mt-4 text-charcoal">
             {data.firstName} {data.lastName}

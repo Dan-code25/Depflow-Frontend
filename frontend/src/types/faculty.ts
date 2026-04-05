@@ -11,6 +11,13 @@ export interface Faculty {
   employeeId: string;
   dateHired: string;
   designation: string;
+  // Additional personal info fields
+  city?: string;
+  province?: string;
+  age?: number;
+  birthDate?: string;
+  title?: string;
+  gender?: string | null;
 }
 
 export interface AddFacultyFormData {

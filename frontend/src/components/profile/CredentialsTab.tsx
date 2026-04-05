@@ -9,8 +9,9 @@ import type { Credential, CredentialType } from "../../types/profile";
 
 interface CredentialsTabProps {
   credentials: Credential[];
-  onAdd: (credential: Credential, type: CredentialType) => void;
-  onDelete: (id: string | undefined, type: CredentialType) => void;
+  onAdd?: (credential: Credential, type: CredentialType) => void;
+  onDelete?: (id: string | undefined, type: CredentialType) => void;
+  readOnly?: boolean;
 }
 
 const CREDENTIAL_SECTIONS: { type: CredentialType; label: string }[] = [
@@ -24,6 +25,7 @@ export default function CredentialsTab({
   credentials,
   onAdd,
   onDelete,
+  readOnly = false,
 }: CredentialsTabProps) {
   const [certificationModalOpen, setCertificationModalOpen] = useState(false);
   const [licenseModalOpen, setLicenseModalOpen] = useState(false);
@@ -38,7 +40,7 @@ export default function CredentialsTab({
     data: { credential: Credential },
     type: CredentialType,
   ) => {
-    onAdd(data.credential, type);
+    onAdd?.(data.credential, type);
     closeModal(type);
   };
 
@@ -46,7 +48,7 @@ export default function CredentialsTab({
     id: string | undefined,
     type: CredentialType,
   ) => {
-    onDelete(id, type);
+    onDelete?.(id, type);
   };
 
   const openModal = (type: CredentialType) => {
@@ -113,8 +115,11 @@ export default function CredentialsTab({
                   <CredentialCard
                     key={credential.id}
                     credential={credential}
-                    onDelete={() =>
-                      handleDeleteCredential(credential.id, section.type)
+                    onDelete={
+                      !readOnly
+                        ? () =>
+                            handleDeleteCredential(credential.id, section.type)
+                        : undefined
                     }
                   />
                 ))
@@ -122,35 +127,41 @@ export default function CredentialsTab({
             </div>
 
             {/* Add Button */}
-            <AddButton
-              label={`Add ${section.label.slice(0, -1)}`}
-              onClick={() => openModal(section.type)}
-            />
+            {!readOnly && onAdd && (
+              <AddButton
+                label={`Add ${section.label.slice(0, -1)}`}
+                onClick={() => openModal(section.type)}
+              />
+            )}
           </div>
         );
       })}
 
-      {/* Modals */}
-      <AddCertificationModal
-        isOpen={certificationModalOpen}
-        onClose={() => closeModal("certification")}
-        onSubmit={(cred) => handleAddCredential(cred, "certification")}
-      />
-      <AddLicenseModal
-        isOpen={licenseModalOpen}
-        onClose={() => closeModal("license")}
-        onSubmit={(cred) => handleAddCredential(cred, "license")}
-      />
-      <AddSeminarModal
-        isOpen={seminarModalOpen}
-        onClose={() => closeModal("seminar")}
-        onSubmit={(cred) => handleAddCredential(cred, "seminar")}
-      />
-      <AddExperienceModal
-        isOpen={experienceModalOpen}
-        onClose={() => closeModal("experience")}
-        onSubmit={(cred) => handleAddCredential(cred, "experience")}
-      />
+      {/* Modals - Only render in edit mode */}
+      {!readOnly && onAdd && (
+        <>
+          <AddCertificationModal
+            isOpen={certificationModalOpen}
+            onClose={() => closeModal("certification")}
+            onSubmit={(cred) => handleAddCredential(cred, "certification")}
+          />
+          <AddLicenseModal
+            isOpen={licenseModalOpen}
+            onClose={() => closeModal("license")}
+            onSubmit={(cred) => handleAddCredential(cred, "license")}
+          />
+          <AddSeminarModal
+            isOpen={seminarModalOpen}
+            onClose={() => closeModal("seminar")}
+            onSubmit={(cred) => handleAddCredential(cred, "seminar")}
+          />
+          <AddExperienceModal
+            isOpen={experienceModalOpen}
+            onClose={() => closeModal("experience")}
+            onSubmit={(cred) => handleAddCredential(cred, "experience")}
+          />
+        </>
+      )}
     </div>
   );
 }

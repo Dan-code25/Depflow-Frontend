@@ -5,7 +5,7 @@ import ConfirmDeleteModal from "./ConfirmDeleteModal";
 
 interface ResearchCardProps {
   research: Research;
-  onDelete: (id: string | undefined) => void;
+  onDelete?: (id: string | undefined) => void;
 }
 
 export default function ResearchCard({
@@ -22,7 +22,7 @@ export default function ResearchCard({
   const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
-      onDelete(research.researchId);
+      onDelete?.(research.researchId);
       setIsModalOpen(false);
     } finally {
       setIsDeleting(false);
@@ -67,13 +67,15 @@ export default function ResearchCard({
           </div>
 
           {/* Delete Button */}
-          <button
-            onClick={handleDeleteClick}
-            className="p-2 text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-2 cursor-pointer"
-            title="Delete research"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {onDelete && (
+            <button
+              onClick={handleDeleteClick}
+              className="p-2 text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-2 cursor-pointer"
+              title="Delete research"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

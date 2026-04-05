@@ -13,6 +13,7 @@ import FacultyAnnouncementsPage from "./pages/faculty/FacultyAnnouncementsPage";
 import FacultyInformationPage from "./pages/faculty/FacultyInformationPage";
 import { LoadingSpinner } from "./components/common/LoadingSpinner";
 import ManageFacultyPage from "./pages/admin/ManageFacultyPage";
+import FacultyProfileViewPage from "./pages/admin/FacultyProfileViewPage";
 
 const cliendId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -39,6 +40,7 @@ function AppRoutes() {
           element={<AdminAnnouncementsPage />}
         />
         <Route path="/admin/manage-faculty" element={<ManageFacultyPage />} />
+        <Route path="/admin/faculty/:id" element={<FacultyProfileViewPage />} />
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="faculty" />}>
@@ -51,6 +53,10 @@ function AppRoutes() {
         <Route
           path="/faculty/information"
           element={<FacultyInformationPage />}
+        />
+        <Route
+          path="/faculty/faculty/:id"
+          element={<FacultyProfileViewPage />}
         />
       </Route>
 

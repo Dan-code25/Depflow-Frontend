@@ -22,6 +22,29 @@ export const getResearch = async () => {
   }
 };
 
+// Fetch research for a specific faculty member
+export const getFacultyResearch = async (facultyId: string) => {
+  try {
+    const response = await api.get(
+      `/faculty-information/research/faculty/${facultyId}`,
+    );
+    const data = response.data;
+
+    const researches: Research[] = (data || []).map((item: any) => ({
+      researchId: item.res_id?.toString(),
+      title: item.title,
+      journalConference: item.journal_conference,
+      type: item.research_type,
+      year: item.published_year,
+    }));
+
+    return researches;
+  } catch (error) {
+    console.error("Error fetching faculty research:", error);
+    throw error;
+  }
+};
+
 // Add research
 export const addResearch = async (research: Research) => {
   try {

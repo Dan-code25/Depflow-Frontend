@@ -8,13 +8,22 @@ interface FacultyGridProps {
   isAdmin?: boolean;
 }
 
-export function FacultyGrid({ faculty, onViewProfile, onDeleteClick, isAdmin = false }: FacultyGridProps) {
+export function FacultyGrid({
+  faculty,
+  onViewProfile,
+  onDeleteClick,
+  isAdmin = false,
+}: FacultyGridProps) {
   if (faculty.length === 0) {
     return (
       <div className="flex items-center justify-center py-16 px-4">
         <div className="text-center">
-          <p className="text-lg text-slate-600 font-medium mb-2">No faculty members found</p>
-          <p className="text-slate-500 text-sm">Try adjusting your filters or add new faculty members</p>
+          <p className="text-lg text-slate-600 font-medium mb-2">
+            No faculty members found
+          </p>
+          <p className="text-slate-500 text-sm">
+            Try adjusting your filters or add new faculty members
+          </p>
         </div>
       </div>
     );
@@ -33,8 +42,12 @@ export function FacultyGrid({ faculty, onViewProfile, onDeleteClick, isAdmin = f
     return (
       <div className="flex items-center justify-center py-16 px-4">
         <div className="text-center">
-          <p className="text-lg text-slate-600 font-medium mb-2">No valid faculty members found</p>
-          <p className="text-slate-500 text-sm">There was an issue loading faculty data</p>
+          <p className="text-lg text-slate-600 font-medium mb-2">
+            No valid faculty members found
+          </p>
+          <p className="text-slate-500 text-sm">
+            There was an issue loading faculty data
+          </p>
         </div>
       </div>
     );

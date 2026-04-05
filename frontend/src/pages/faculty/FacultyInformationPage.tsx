@@ -48,7 +48,7 @@ export default function FacultyInformationPage() {
   }, [faculty, selectedFilter, selectedEmploymentFilter]);
 
   const handleViewProfile = (selectedFaculty: Faculty) => {
-    navigate(`/admin/profile`, { state: { facultyId: selectedFaculty.id } });
+    navigate(`/faculty/faculty/${selectedFaculty.id}`);
   };
 
   return (

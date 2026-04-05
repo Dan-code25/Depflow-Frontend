@@ -6,19 +6,21 @@ import type { Research } from "../../types/profile";
 
 interface ResearchTabProps {
   researches: Research[];
-  onAdd: (research: Research) => void;
-  onDelete: (id: string | undefined) => void;
+  onAdd?: (research: Research) => void;
+  onDelete?: (id: string | undefined) => void;
+  readOnly?: boolean;
 }
 
 export default function ResearchTab({
   researches,
   onAdd,
   onDelete,
+  readOnly = false,
 }: ResearchTabProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleSubmit = (research: Research) => {
-    onAdd(research);
+    onAdd?.(research);
     setIsModalOpen(false);
   };
 
@@ -38,19 +40,26 @@ export default function ResearchTab({
             <ResearchCard
               key={research.researchId || `${research.title}-${index}`}
               research={research}
-              onDelete={onDelete}
+              onDelete={!readOnly ? onDelete : undefined}
             />
           ))
         )}
       </div>
 
-      <AddButton label="Add Research" onClick={() => setIsModalOpen(true)} />
+      {!readOnly && onAdd && (
+        <>
+          <AddButton
+            label="Add Research"
+            onClick={() => setIsModalOpen(true)}
+          />
 
-      <AddResearchModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmit}
-      />
+          <AddResearchModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onSubmit={handleSubmit}
+          />
+        </>
+      )}
     </div>
   );
 }

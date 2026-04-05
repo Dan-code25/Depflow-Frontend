@@ -1,4 +1,4 @@
-import type { ProfileData} from "../types/profile";
+import type { ProfileData } from "../types/profile";
 import api from "./api";
 
 export const getPersonalInfo = async () => {
@@ -39,6 +39,34 @@ export const getProfilePicture = async () => {
   } catch (error) {
     console.error("Error fetching profile picture:", error);
     throw error;
+  }
+};
+
+// Fetch profile picture for a specific faculty member
+export const getFacultyProfilePicture = async (facultyId: string) => {
+  try {
+    const response = await api.get(
+      `/faculty-information/profile-picture/${facultyId}`,
+    );
+    console.log("Fetched faculty profile picture:", response.data);
+
+    return response.data.photoUrl || "";
+  } catch (error) {
+    console.error("Error fetching faculty profile picture:", error);
+    return "";
+  }
+};
+
+export const getFacultyPersonalInfo = async (facultyId: string) => {
+  try {
+    const response = await api.get(
+      `/profile/faculty/${facultyId}/personal-info`,
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching faculty personal info:", error);
+    // Return empty object on error - will use defaults
+    return {};
   }
 };
 

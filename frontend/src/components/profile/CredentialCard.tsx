@@ -5,7 +5,7 @@ import type { Credential } from "../../types/profile";
 
 interface CredentialCardProps {
   credential: Credential;
-  onDelete: () => void;
+  onDelete?: () => void;
 }
 
 const getCredentialIcon = (type: string) => {
@@ -70,7 +70,7 @@ export default function CredentialCard({
 
   const handleConfirmDelete = () => {
     setIsDeleting(true);
-    onDelete();
+    onDelete?.();
     setIsModalOpen(false);
     setIsDeleting(false);
   };
@@ -111,13 +111,15 @@ export default function CredentialCard({
           </div>
 
           {/* Delete Button */}
-          <button
-            onClick={handleDeleteClick}
-            className="p-2 text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-2 cursor-pointer"
-            title="Delete credential"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {onDelete && (
+            <button
+              onClick={handleDeleteClick}
+              className="p-2 text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-2 cursor-pointer"
+              title="Delete credential"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

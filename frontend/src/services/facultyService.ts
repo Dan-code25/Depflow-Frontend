@@ -4,6 +4,7 @@ import {
   mapToBackendFaculty,
   type BackendFaculty,
 } from "../utils/facultyMapper";
+import type { AddFacultyFormData } from "../types/faculty";
 
 export const getAllFaculty = async () => {
   try {
@@ -23,7 +24,17 @@ export const getAllFaculty = async () => {
   }
 };
 
-export const addFaculty = async (facultyData: any) => {
+export const getFacultyById = async (facultyId: string) => {
+  try {
+    const response = await api.get(`/faculty-information/profile/${facultyId}`);
+    return mapBackendFaculty(response.data);
+  } catch (error) {
+    console.error("Error fetching faculty:", error);
+    throw error;
+  }
+};
+
+export const addFaculty = async (facultyData: AddFacultyFormData) => {
   try {
     // Debug: Log form data to check field names
     console.log("Form data received:", facultyData);

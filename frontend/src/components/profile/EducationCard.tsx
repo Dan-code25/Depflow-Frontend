@@ -5,7 +5,7 @@ import ConfirmDeleteModal from "./ConfirmDeleteModal";
 
 interface EducationCardProps {
   education: Education;
-  onDelete: (id: string | undefined) => void;
+  onDelete?: (id: string | undefined) => void;
 }
 
 export default function EducationCard({
@@ -29,7 +29,7 @@ export default function EducationCard({
   const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
-      onDelete(education.edId);
+      onDelete?.(education.edId);
       setIsModalOpen(false);
     } finally {
       setIsDeleting(false);
@@ -68,13 +68,15 @@ export default function EducationCard({
           </div>
 
           {/* Delete Button */}
-          <button
-            onClick={handleDeleteClick}
-            className="p-2 text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-2 cursor-pointer"
-            title="Delete education"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {onDelete && (
+            <button
+              onClick={handleDeleteClick}
+              className="p-2 text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-2 cursor-pointer"
+              title="Delete education"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

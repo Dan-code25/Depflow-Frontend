@@ -23,6 +23,7 @@ interface ProfileViewProps {
   researches?: Research[];
   onAddResearch?: (research: Research) => void;
   onDeleteResearch?: (id: string | undefined) => void;
+  readOnly?: boolean;
 }
 
 const InfoField = ({ label, value }: { label: string; value: string }) => (
@@ -70,13 +71,15 @@ export default function ProfileView({
   researches = [],
   onAddResearch,
   onDeleteResearch,
+  readOnly = false,
 }: ProfileViewProps) {
   if (activeTab === "education") {
     return (
       <EducationTab
         educations={educations}
-        onAdd={onAddEducation || (() => {})}
-        onDelete={onDeleteEducation || (() => {})}
+        onAdd={onAddEducation}
+        onDelete={onDeleteEducation}
+        readOnly={readOnly}
       />
     );
   }
@@ -85,8 +88,9 @@ export default function ProfileView({
     return (
       <CredentialsTab
         credentials={credentials}
-        onAdd={onAddCredential || (() => {})}
-        onDelete={onDeleteCredential || (() => {})}
+        onAdd={onAddCredential}
+        onDelete={onDeleteCredential}
+        readOnly={readOnly}
       />
     );
   }
@@ -95,8 +99,9 @@ export default function ProfileView({
     return (
       <ResearchTab
         researches={researches}
-        onAdd={onAddResearch || (() => {})}
-        onDelete={onDeleteResearch || (() => {})}
+        onAdd={onAddResearch}
+        onDelete={onDeleteResearch}
+        readOnly={readOnly}
       />
     );
   }
@@ -108,7 +113,7 @@ export default function ProfileView({
           <h3 className="text-xs sm:text-sm font-bold text-burgundy uppercase">
             Basic Information
           </h3>
-          {onEdit && (
+          {!readOnly && onEdit && (
             <button
               onClick={onEdit}
               className="px-3 sm:px-4 py-2 border-2 border-burgundy text-burgundy rounded hover:bg-burgundy hover:text-white transition flex items-center gap-2 text-sm"

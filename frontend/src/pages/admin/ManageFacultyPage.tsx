@@ -11,7 +11,11 @@ import type {
   CoreGroupFilter,
   EmploymentTypeFilter,
 } from "../../types/faculty";
-import { getAllFaculty, addFaculty, deleteFaculty } from "../../services/facultyService";
+import {
+  getAllFaculty,
+  addFaculty,
+  deleteFaculty,
+} from "../../services/facultyService";
 
 export default function ManageFacultyPage() {
   const navigate = useNavigate();
@@ -106,9 +110,8 @@ export default function ManageFacultyPage() {
 
   // Handle view profile - navigate to faculty profile page
   const handleViewProfile = (selectedFaculty: Faculty) => {
-    // Navigate to the faculty profile page
-    // In a real app, you might store the faculty ID in context or URL params
-    navigate(`/admin/profile`, { state: { facultyId: selectedFaculty.id } });
+    // Navigate to the faculty profile view page with faculty ID
+    navigate(`/admin/faculty/${selectedFaculty.id}`);
   };
 
   // Page title based on role
