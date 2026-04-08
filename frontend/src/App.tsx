@@ -14,6 +14,7 @@ import FacultyInformationPage from "./pages/faculty/FacultyInformationPage";
 import { LoadingSpinner } from "./components/common/LoadingSpinner";
 import ManageFacultyPage from "./pages/admin/ManageFacultyPage";
 import FacultyProfileViewPage from "./pages/admin/FacultyProfileViewPage";
+import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 
 const cliendId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -41,6 +42,7 @@ function AppRoutes() {
         />
         <Route path="/admin/manage-faculty" element={<ManageFacultyPage />} />
         <Route path="/admin/faculty/:id" element={<FacultyProfileViewPage />} />
+        <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="faculty" />}>
