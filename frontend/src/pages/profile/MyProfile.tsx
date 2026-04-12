@@ -6,7 +6,13 @@ import ProfileSidebar from "../../components/profile/ProfileSidebar";
 import ProfileTabs from "../../components/profile/ProfileTabs";
 import ProfileView from "../../components/profile/ProfileView";
 import ProfileEdit from "../../components/profile/ProfileEdit";
-import type { ProfileData, Education, Credential, Research, Availability } from "../../types/profile";
+import type {
+  ProfileData,
+  Education,
+  Credential,
+  Research,
+  Availability,
+} from "../../types/profile";
 
 import {
   getPersonalInfo,
@@ -261,12 +267,16 @@ export default function MyProfile() {
         };
 
         setResearches((prev) =>
-          prev.map((r) => (r.researchId === optimisticId ? backendResearch : r)),
+          prev.map((r) =>
+            r.researchId === optimisticId ? backendResearch : r,
+          ),
         );
       }
     } catch (error) {
       // On error, remove optimistic research
-      setResearches((prev) => prev.filter((r) => r.researchId !== optimisticId));
+      setResearches((prev) =>
+        prev.filter((r) => r.researchId !== optimisticId),
+      );
       console.error("Failed to add research:", error);
     }
   };
@@ -447,7 +457,10 @@ export default function MyProfile() {
             </div>
 
             <div className="lg:col-span-4">
-              <ProfileTabs activeTab={activeTab} onTabChange={handleTabChange} />
+              <ProfileTabs
+                activeTab={activeTab}
+                onTabChange={handleTabChange}
+              />
 
               {isEditing ? (
                 <ProfileEdit

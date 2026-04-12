@@ -4,7 +4,9 @@ interface AvailabilityDisplayProps {
   availability: Availability;
 }
 
-export default function AvailabilityDisplay({ availability }: AvailabilityDisplayProps) {
+export default function AvailabilityDisplay({
+  availability,
+}: AvailabilityDisplayProps) {
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-6 sm:p-8">
       <h3 className="text-xs sm:text-sm font-bold text-burgundy uppercase mb-6">
@@ -36,7 +38,10 @@ export default function AvailabilityDisplay({ availability }: AvailabilityDispla
           </h4>
           <div className="space-y-2">
             {Object.entries(availability.dayTimeRanges).map(([day, times]) => (
-              <div key={day} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div
+                key={day}
+                className="flex items-center justify-between p-3 bg-slate-50 rounded-lg"
+              >
                 <span className="font-semibold text-slate-900">{day}</span>
                 <span className="text-slate-600">
                   {times.startTime} - {times.endTime}
@@ -70,7 +75,9 @@ export default function AvailabilityDisplay({ availability }: AvailabilityDispla
             <h4 className="text-xs font-bold text-slate-600 uppercase mb-2">
               Additional Notes
             </h4>
-            <p className="text-slate-700 italic">{availability.additionalNotes}</p>
+            <p className="text-slate-700 italic">
+              {availability.additionalNotes}
+            </p>
           </div>
         )}
       </div>

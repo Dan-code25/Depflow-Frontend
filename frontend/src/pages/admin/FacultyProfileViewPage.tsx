@@ -8,7 +8,13 @@ import ProfileSidebar from "../../components/profile/ProfileSidebar";
 import ProfileTabs from "../../components/profile/ProfileTabs";
 import ProfileView from "../../components/profile/ProfileView";
 import { LoadingSpinner } from "../../components/common/LoadingSpinner";
-import type { ProfileData, Education, Credential, Research, Availability } from "../../types/profile";
+import type {
+  ProfileData,
+  Education,
+  Credential,
+  Research,
+  Availability,
+} from "../../types/profile";
 import type { Faculty } from "../../types/faculty";
 import { getFacultyById } from "../../services/facultyService";
 import { getFacultyEducations } from "../../services/educationService";
@@ -87,7 +93,13 @@ export default function FacultyProfileViewPage() {
         setIsLoading(true);
 
         // Fetch all faculty data in parallel
-        const [facultyData, educationData, credentialsData, researchData, availabilityData] = await Promise.all([
+        const [
+          facultyData,
+          educationData,
+          credentialsData,
+          researchData,
+          availabilityData,
+        ] = await Promise.all([
           getFacultyById(id),
           getFacultyEducations(id).catch(() => []),
           getFacultyCredentials(id).catch(() => []),

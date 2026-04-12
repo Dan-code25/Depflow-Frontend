@@ -4,7 +4,9 @@ import AvailabilityDisplay from "./AvailabilityDisplay";
 
 interface AvailabilityTabProps {
   availability: Availability | null;
-  onSave: (availability: Omit<Availability, "id" | "createdAt" | "updatedAt">) => void;
+  onSave: (
+    availability: Omit<Availability, "id" | "createdAt" | "updatedAt">,
+  ) => void;
   onDelete?: () => void;
   isLoading?: boolean;
   readOnly?: boolean;

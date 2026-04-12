@@ -8,7 +8,9 @@ import type { Subject } from "../../utils/availabilityConstants";
 
 interface AvailabilityFormProps {
   availability?: Availability | null;
-  onSave: (availability: Omit<Availability, "id" | "createdAt" | "updatedAt">) => void;
+  onSave: (
+    availability: Omit<Availability, "id" | "createdAt" | "updatedAt">,
+  ) => void;
   isLoading?: boolean;
 }
 
@@ -23,9 +25,13 @@ export default function AvailabilityForm({
   const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState({
-    subjectIds: availability?.subjectIds || [] as string[],
-    dayTimeRanges: availability?.dayTimeRanges || ({} as Record<string, DayTimeRange>),
-    schedulingPriority: (availability?.schedulingPriority || "Medium") as "Low" | "Medium" | "High",
+    subjectIds: availability?.subjectIds || ([] as string[]),
+    dayTimeRanges:
+      availability?.dayTimeRanges || ({} as Record<string, DayTimeRange>),
+    schedulingPriority: (availability?.schedulingPriority || "Medium") as
+      | "Low"
+      | "Medium"
+      | "High",
     additionalNotes: availability?.additionalNotes || "",
   });
 
@@ -72,7 +78,11 @@ export default function AvailabilityForm({
     setErrors([]);
   };
 
-  const handleTimeChange = (day: string, field: "startTime" | "endTime", value: string) => {
+  const handleTimeChange = (
+    day: string,
+    field: "startTime" | "endTime",
+    value: string,
+  ) => {
     setFormData((prev) => ({
       ...prev,
       dayTimeRanges: {
@@ -111,7 +121,10 @@ export default function AvailabilityForm({
     }
 
     setIsSaving(true);
-    const availabilityData: Omit<Availability, "id" | "createdAt" | "updatedAt"> = {
+    const availabilityData: Omit<
+      Availability,
+      "id" | "createdAt" | "updatedAt"
+    > = {
       subjectIds: formData.subjectIds,
       subjectNames: formData.subjectIds
         .map((id) => subjects.find((s) => s.id === id)?.name || "")
@@ -158,7 +171,10 @@ export default function AvailabilityForm({
       {errors.length > 0 && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
           <div className="flex gap-3">
-            <AlertCircle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+            <AlertCircle
+              size={20}
+              className="text-red-600 flex-shrink-0 mt-0.5"
+            />
             <div>
               {errors.map((error, idx) => (
                 <p key={idx} className="text-sm text-red-700">
@@ -181,7 +197,10 @@ export default function AvailabilityForm({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {subjects.map((subject) => (
-                <label key={subject.id} className="flex items-center gap-2 cursor-pointer">
+                <label
+                  key={subject.id}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
                   <input
                     type="checkbox"
                     checked={formData.subjectIds.includes(subject.id)}
@@ -266,7 +285,8 @@ export default function AvailabilityForm({
             ))}
           </select>
           <p className="text-xs text-slate-500 mt-1">
-            How strictly should your time preferences be respected during scheduling
+            How strictly should your time preferences be respected during
+            scheduling
           </p>
         </div>
 

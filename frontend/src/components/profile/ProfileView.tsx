@@ -26,7 +26,9 @@ interface ProfileViewProps {
   onAddResearch?: (research: Research) => void;
   onDeleteResearch?: (id: string | undefined) => void;
   availability?: Availability | null;
-  onSaveAvailability?: (availability: Omit<Availability, "id" | "createdAt" | "updatedAt">) => void;
+  onSaveAvailability?: (
+    availability: Omit<Availability, "id" | "createdAt" | "updatedAt">,
+  ) => void;
   onDeleteAvailability?: () => void;
   readOnly?: boolean;
 }

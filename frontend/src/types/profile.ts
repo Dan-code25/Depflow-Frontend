@@ -53,19 +53,27 @@ export interface Research {
   researchId?: string;
   title: string;
   journalConference: string;
-  type: "Journal" | "Conference" | "Thesis/Dissertation" | "Book/Chapter" | "Patent" | "Technical Report" | "Policy Brief" | "Research Project";
+  type:
+    | "Journal"
+    | "Conference"
+    | "Thesis/Dissertation"
+    | "Book/Chapter"
+    | "Patent"
+    | "Technical Report"
+    | "Policy Brief"
+    | "Research Project";
   year: number;
 }
 
 export interface DayTimeRange {
   startTime: string; // "09:00"
-  endTime: string;   // "12:00"
+  endTime: string; // "12:00"
 }
 
 export interface Availability {
   id: string;
-  subjectIds: string[];           // Multiple subjects they can teach
-  subjectNames: string[];         // Subject names for display
+  subjectIds: string[]; // Multiple subjects they can teach
+  subjectNames: string[]; // Subject names for display
   dayTimeRanges: Record<string, DayTimeRange>; // {"Monday": {startTime, endTime}, "Wednesday": {...}}
   schedulingPriority: "Low" | "Medium" | "High";
   additionalNotes?: string;

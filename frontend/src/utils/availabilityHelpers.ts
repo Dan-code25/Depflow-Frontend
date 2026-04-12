@@ -5,9 +5,7 @@ import type { DayTimeRange } from "../types/profile";
  * @example formatDaysDisplay(["Monday", "Wednesday", "Friday"]) -> "Mon, Wed, Fri"
  */
 export const formatDaysDisplay = (days: string[]): string => {
-  return days
-    .map((day) => day.substring(0, 3))
-    .join(", ");
+  return days.map((day) => day.substring(0, 3)).join(", ");
 };
 
 /**
@@ -22,16 +20,24 @@ export const formatTimeRange = (startTime: string, endTime: string): string => {
  * Format day time ranges to readable string
  * @example { Monday: {startTime: "09:00", endTime: "11:00"}, ... } -> "Mon: 09:00-11:00, Wed: 09:00-11:00, ..."
  */
-export const formatDayTimeRanges = (dayTimeRanges: Record<string, DayTimeRange>): string => {
+export const formatDayTimeRanges = (
+  dayTimeRanges: Record<string, DayTimeRange>,
+): string => {
   return Object.entries(dayTimeRanges)
-    .map(([day, times]) => `${day.substring(0, 3)}: ${times.startTime}-${times.endTime}`)
+    .map(
+      ([day, times]) =>
+        `${day.substring(0, 3)}: ${times.startTime}-${times.endTime}`,
+    )
     .join(", ");
 };
 
 /**
  * Validate that end time is after start time
  */
-export const validateTimeRange = (startTime: string, endTime: string): boolean => {
+export const validateTimeRange = (
+  startTime: string,
+  endTime: string,
+): boolean => {
   const [startHour, startMin] = startTime.split(":").map(Number);
   const [endHour, endMin] = endTime.split(":").map(Number);
 
@@ -66,7 +72,11 @@ export const validateAvailabilityForm = (
     if (!times.endTime) {
       errors.push(`${day}: End time is required`);
     }
-    if (times.startTime && times.endTime && !validateTimeRange(times.startTime, times.endTime)) {
+    if (
+      times.startTime &&
+      times.endTime &&
+      !validateTimeRange(times.startTime, times.endTime)
+    ) {
       errors.push(`${day}: End time must be after start time`);
     }
   });
