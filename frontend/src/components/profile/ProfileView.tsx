@@ -4,11 +4,13 @@ import type {
   Credential,
   CredentialType,
   Research,
+  Availability,
 } from "../../types/profile";
 import { Edit2 } from "lucide-react";
 import EducationTab from "./EducationTab";
 import CredentialsTab from "./CredentialsTab";
 import ResearchTab from "./ResearchTab";
+import AvailabilityTab from "./AvailabilityTab";
 
 interface ProfileViewProps {
   data: ProfileData;
@@ -23,6 +25,9 @@ interface ProfileViewProps {
   researches?: Research[];
   onAddResearch?: (research: Research) => void;
   onDeleteResearch?: (id: string | undefined) => void;
+  availability?: Availability | null;
+  onSaveAvailability?: (availability: Omit<Availability, "id" | "createdAt" | "updatedAt">) => void;
+  onDeleteAvailability?: () => void;
   readOnly?: boolean;
 }
 
@@ -71,6 +76,9 @@ export default function ProfileView({
   researches = [],
   onAddResearch,
   onDeleteResearch,
+  availability = null,
+  onSaveAvailability,
+  onDeleteAvailability,
   readOnly = false,
 }: ProfileViewProps) {
   if (activeTab === "education") {
@@ -101,6 +109,17 @@ export default function ProfileView({
         researches={researches}
         onAdd={onAddResearch}
         onDelete={onDeleteResearch}
+        readOnly={readOnly}
+      />
+    );
+  }
+
+  if (activeTab === "availability") {
+    return (
+      <AvailabilityTab
+        availability={availability}
+        onSave={onSaveAvailability!}
+        onDelete={onDeleteAvailability}
         readOnly={readOnly}
       />
     );

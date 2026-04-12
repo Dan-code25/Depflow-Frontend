@@ -57,6 +57,22 @@ export interface Research {
   year: number;
 }
 
+export interface DayTimeRange {
+  startTime: string; // "09:00"
+  endTime: string;   // "12:00"
+}
+
+export interface Availability {
+  id: string;
+  subjectIds: string[];           // Multiple subjects they can teach
+  subjectNames: string[];         // Subject names for display
+  dayTimeRanges: Record<string, DayTimeRange>; // {"Monday": {startTime, endTime}, "Wednesday": {...}}
+  schedulingPriority: "Low" | "Medium" | "High";
+  additionalNotes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Announcement {
   id?: string;
   title: string;

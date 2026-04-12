@@ -6,7 +6,7 @@ import ProfileSidebar from "../../components/profile/ProfileSidebar";
 import ProfileTabs from "../../components/profile/ProfileTabs";
 import ProfileView from "../../components/profile/ProfileView";
 import ProfileEdit from "../../components/profile/ProfileEdit";
-import type { ProfileData, Education, Credential, Research } from "../../types/profile";
+import type { ProfileData, Education, Credential, Research, Availability } from "../../types/profile";
 
 import {
   getPersonalInfo,
@@ -35,6 +35,11 @@ import {
   getResearch,
   deleteResearch,
 } from "../../services/researchService";
+import {
+  getAvailability,
+  saveAvailability,
+  deleteAvailability,
+} from "../../services/availabilityService";
 
 export default function MyProfile() {
   const [isEditing, setIsEditing] = useState(false);
@@ -58,6 +63,7 @@ export default function MyProfile() {
   const [educations, setEducations] = useState<Education[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [researches, setResearches] = useState<Research[]>([]);
+  const [availability, setAvailability] = useState<Availability | null>(null);
 
   const handleTabChange = (tab: string) => {
     if (isEditing) {
@@ -287,6 +293,26 @@ export default function MyProfile() {
     }
   };
 
+  const handleSaveAvailability = async (
+    availabilityData: Omit<Availability, "id" | "createdAt" | "updatedAt">,
+  ) => {
+    try {
+      const response = await saveAvailability(availabilityData);
+      setAvailability(response);
+    } catch (error) {
+      console.error("Failed to save availability:", error);
+    }
+  };
+
+  const handleDeleteAvailability = async () => {
+    try {
+      await deleteAvailability();
+      setAvailability(null);
+    } catch (error) {
+      console.error("Failed to delete availability:", error);
+    }
+  };
+
   const userRole = localStorage.getItem("user_role");
   const Layout = userRole === "admin" ? AdminLayout : FacultyLayout;
 
@@ -392,6 +418,18 @@ export default function MyProfile() {
     fetchResearchData();
   }, []);
 
+  useEffect(() => {
+    const fetchAvailabilityData = async () => {
+      try {
+        const availabilityData = await getAvailability();
+        setAvailability(availabilityData);
+      } catch (error) {
+        console.error("Failed to fetch availability data:", error);
+      }
+    };
+    fetchAvailabilityData();
+  }, []);
+
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -432,6 +470,9 @@ export default function MyProfile() {
                   researches={researches}
                   onAddResearch={handleAddResearch}
                   onDeleteResearch={handleDeleteResearch}
+                  availability={availability}
+                  onSaveAvailability={handleSaveAvailability}
+                  onDeleteAvailability={handleDeleteAvailability}
                 />
               )}
             </div>

@@ -15,8 +15,9 @@ export const useAutoLogin = () => {
 
       try {
         const res = await api.get("/auth/verify");
+        console.log("Data:", res)
         const data = res.data as {
-          user: { email: string; sub: string };
+          user: { email: string; sub: string, picture: string };
           userInfo: { role: string };
         };
 

@@ -1,4 +1,4 @@
-import { User, GraduationCap, Award, BookOpen } from "lucide-react";
+import { User, GraduationCap, Award, BookOpen, Clock } from "lucide-react";
 
 interface ProfileTabsProps {
   activeTab: string;
@@ -10,6 +10,7 @@ const TABS = [
   { id: "education", label: "Education", Icon: GraduationCap },
   { id: "credentials", label: "Credentials", Icon: Award },
   { id: "research", label: "Research", Icon: BookOpen },
+  { id: "availability", label: "Availability", Icon: Clock }
 ];
 
 export default function ProfileTabs({

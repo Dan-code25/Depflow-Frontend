@@ -8,12 +8,13 @@ import ProfileSidebar from "../../components/profile/ProfileSidebar";
 import ProfileTabs from "../../components/profile/ProfileTabs";
 import ProfileView from "../../components/profile/ProfileView";
 import { LoadingSpinner } from "../../components/common/LoadingSpinner";
-import type { ProfileData, Education, Credential, Research } from "../../types/profile";
+import type { ProfileData, Education, Credential, Research, Availability } from "../../types/profile";
 import type { Faculty } from "../../types/faculty";
 import { getFacultyById } from "../../services/facultyService";
 import { getFacultyEducations } from "../../services/educationService";
 import { getFacultyCredentials } from "../../services/credentialsService";
 import { getFacultyResearch } from "../../services/researchService";
+import { getFacultyAvailability } from "../../services/availabilityService";
 import { getFacultyProfilePicture } from "../../services/profileService";
 
 // Helper to create empty profile data
@@ -72,6 +73,7 @@ export default function FacultyProfileViewPage() {
   const [educations, setEducations] = useState<Education[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [researches, setResearches] = useState<Research[]>([]);
+  const [availability, setAvailability] = useState<Availability | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const userRole = localStorage.getItem("user_role");
@@ -85,17 +87,19 @@ export default function FacultyProfileViewPage() {
         setIsLoading(true);
 
         // Fetch all faculty data in parallel
-        const [facultyData, educationData, credentialsData, researchData] = await Promise.all([
+        const [facultyData, educationData, credentialsData, researchData, availabilityData] = await Promise.all([
           getFacultyById(id),
           getFacultyEducations(id).catch(() => []),
           getFacultyCredentials(id).catch(() => []),
           getFacultyResearch(id).catch(() => []),
+          getFacultyAvailability(id).catch(() => null),
         ]);
 
         setFaculty(facultyData);
         setEducations(educationData);
         setCredentials(credentialsData);
         setResearches(researchData);
+        setAvailability(availabilityData);
 
         // Fetch profile picture separately (not critical)
         try {
@@ -192,6 +196,7 @@ export default function FacultyProfileViewPage() {
                 educations={educations}
                 credentials={credentials}
                 researches={researches}
+                availability={availability}
                 readOnly={true}
               />
             </div>
