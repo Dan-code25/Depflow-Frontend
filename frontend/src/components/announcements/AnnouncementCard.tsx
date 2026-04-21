@@ -84,28 +84,29 @@ export function AnnouncementCard({
             </p>
 
             {/* Attachments */}
-            {announcement.attachments && announcement.attachments.length > 0 && (
-              <div className="mb-4 p-3 bg-slate-50 rounded-md border border-slate-200">
-                <p className="text-xs font-semibold text-slate-600 mb-2">
-                  Attachments ({announcement.attachments.length})
-                </p>
-                <div className="space-y-1.5">
-                  {announcement.attachments.map((attachment, idx) => (
-                    <a
-                      key={idx}
-                      href={attachment.url}
-                      download={attachment.filename}
-                      className="flex items-center gap-2 text-sm text-burgundy hover:text-burgundy/80 transition-colors cursor-pointer"
-                    >
-                      <span className="text-xs">📎</span>
-                      <span className="truncate hover:underline">
-                        {attachment.filename}
-                      </span>
-                    </a>
-                  ))}
+            {announcement.attachments &&
+              announcement.attachments.length > 0 && (
+                <div className="mb-4 p-3 bg-slate-50 rounded-md border border-slate-200">
+                  <p className="text-xs font-semibold text-slate-600 mb-2">
+                    Attachments ({announcement.attachments.length})
+                  </p>
+                  <div className="space-y-1.5">
+                    {announcement.attachments.map((attachment, idx) => (
+                      <a
+                        key={idx}
+                        href={attachment.url}
+                        download={attachment.filename}
+                        className="flex items-center gap-2 text-sm text-burgundy hover:text-burgundy/80 transition-colors cursor-pointer"
+                      >
+                        <span className="text-xs">📎</span>
+                        <span className="truncate hover:underline">
+                          {attachment.filename}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Meta Information */}
             <div className="flex flex-wrap gap-4 text-xs text-slate-500 border-t border-slate-100 pt-3">

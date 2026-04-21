@@ -69,7 +69,9 @@ export default function AdminAnnouncementsPage() {
         );
 
         if (!response) {
-          throw new Error("Failed to update announcement: no response from server");
+          throw new Error(
+            "Failed to update announcement: no response from server",
+          );
         }
 
         setAnnouncements((prev) =>
@@ -94,7 +96,9 @@ export default function AdminAnnouncementsPage() {
         const response = await createAnnouncement(announcement, files);
 
         if (!response) {
-          throw new Error("Failed to create announcement: no response from server");
+          throw new Error(
+            "Failed to create announcement: no response from server",
+          );
         }
 
         const newAnnouncement: Announcement = {

@@ -13,7 +13,10 @@ export const getAnnouncements = async () => {
       if (item.file_urls && Array.isArray(item.file_urls)) {
         attachments = item.file_urls.map((url: string, idx: number) => ({
           id: `file-${idx}`,
-          filename: (url.split('/').pop() || `file-${idx}`).replace(/^\d+_/, ''),
+          filename: (url.split("/").pop() || `file-${idx}`).replace(
+            /^\d+_/,
+            "",
+          ),
           url: url,
         }));
       } else if (item.attachments) {
@@ -49,7 +52,10 @@ export const createAnnouncement = async (
     const formData = new FormData();
     formData.append("title", announcement.title);
     formData.append("content", announcement.content);
-    formData.append("announcement_date", new Date().toISOString().split('T')[0]);
+    formData.append(
+      "announcement_date",
+      new Date().toISOString().split("T")[0],
+    );
     if (announcement.createdBy) {
       formData.append("createdBy", announcement.createdBy);
     }
@@ -61,11 +67,15 @@ export const createAnnouncement = async (
       });
     }
 
-    const response = await api.post("/announcements/add-announcement", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
+    const response = await api.post(
+      "/announcements/add-announcement",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       },
-    });
+    );
 
     // Handle Supabase array response or null
     let announcement_ = response.data;
@@ -74,12 +84,21 @@ export const createAnnouncement = async (
     }
 
     // Map file_urls to attachments array
-    if (announcement_ && announcement_.file_urls && Array.isArray(announcement_.file_urls)) {
-      announcement_.attachments = announcement_.file_urls.map((url: string, idx: number) => ({
-        id: `file-${idx}`,
-        filename: (url.split('/').pop() || `file-${idx}`).replace(/^\d+_/, ''),
-        url: url,
-      }));
+    if (
+      announcement_ &&
+      announcement_.file_urls &&
+      Array.isArray(announcement_.file_urls)
+    ) {
+      announcement_.attachments = announcement_.file_urls.map(
+        (url: string, idx: number) => ({
+          id: `file-${idx}`,
+          filename: (url.split("/").pop() || `file-${idx}`).replace(
+            /^\d+_/,
+            "",
+          ),
+          url: url,
+        }),
+      );
     }
 
     // Map backend firstName/lastName fields from nested faculty_profiles
@@ -120,7 +139,10 @@ export const updateAnnouncement = async (
     const formData = new FormData();
     formData.append("title", announcement.title);
     formData.append("content", announcement.content);
-    formData.append("announcement_date", new Date().toISOString().split('T')[0]);
+    formData.append(
+      "announcement_date",
+      new Date().toISOString().split("T")[0],
+    );
     if (announcement.createdBy) {
       formData.append("createdBy", announcement.createdBy);
     }
@@ -145,12 +167,21 @@ export const updateAnnouncement = async (
     }
 
     // Map file_urls to attachments array
-    if (announcement_ && announcement_.file_urls && Array.isArray(announcement_.file_urls)) {
-      announcement_.attachments = announcement_.file_urls.map((url: string, idx: number) => ({
-        id: `file-${idx}`,
-        filename: (url.split('/').pop() || `file-${idx}`).replace(/^\d+_/, ''),
-        url: url,
-      }));
+    if (
+      announcement_ &&
+      announcement_.file_urls &&
+      Array.isArray(announcement_.file_urls)
+    ) {
+      announcement_.attachments = announcement_.file_urls.map(
+        (url: string, idx: number) => ({
+          id: `file-${idx}`,
+          filename: (url.split("/").pop() || `file-${idx}`).replace(
+            /^\d+_/,
+            "",
+          ),
+          url: url,
+        }),
+      );
     }
 
     // Map backend firstName/lastName fields from nested faculty_profiles
