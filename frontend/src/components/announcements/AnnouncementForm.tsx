@@ -100,7 +100,7 @@ export function AnnouncementForm({
       {!isExpanded && (
         <button
           onClick={() => setIsExpanded(true)}
-          className="w-full px-6 py-4 text-left bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white transition-all duration-200 font-semibold flex items-center gap-3 group"
+          className="w-full px-6 py-4 text-left bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white transition-all duration-200 font-semibold flex items-center gap-3 group cursor-pointer"
         >
           <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-all">
             <Send size={20} />
@@ -209,7 +209,7 @@ export function AnnouncementForm({
                 <button
                   type="button"
                   onClick={() => setFile(null)}
-                  className="ml-3 flex-shrink-0 p-2 text-slate-400 hover:text-burgundy hover:bg-burgundy/10 rounded-md transition-all duration-200"
+                  className="ml-3 flex-shrink-0 p-2 text-slate-400 hover:text-burgundy hover:bg-burgundy/10 rounded-md transition-all duration-200 cursor-pointer"
                   disabled={isLoading}
                   title="Remove file"
                 >
@@ -238,7 +238,7 @@ export function AnnouncementForm({
                 setError("");
               }}
               disabled={isLoading}
-              className="px-5 py-2.5 text-slate-700 hover:text-charcoal hover:bg-slate-100 rounded-lg transition-all duration-200 font-semibold disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 text-slate-700 hover:text-charcoal hover:bg-slate-100 rounded-lg transition-all duration-200 font-semibold disabled:opacity-50 flex items-center gap-2 cursor-pointer"
             >
               <X size={18} />
               Cancel
@@ -246,7 +246,7 @@ export function AnnouncementForm({
             <button
               type="submit"
               disabled={isLoading}
-              className="px-6 py-2.5 bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white rounded-lg transition-all duration-200 font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md hover:shadow-lg"
+              className="px-6 py-2.5 bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white rounded-lg transition-all duration-200 font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
             >
               <Send size={20} />
               {isLoading ? "Publishing..." : "Publish Announcement"}

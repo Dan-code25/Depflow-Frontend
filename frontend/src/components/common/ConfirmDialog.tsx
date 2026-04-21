@@ -44,7 +44,7 @@ export function ConfirmDialog({
             <button
               onClick={onCancel}
               disabled={isLoading}
-              className="text-slate-500 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="text-slate-500 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               aria-label="Close dialog"
             >
               <X size={20} />

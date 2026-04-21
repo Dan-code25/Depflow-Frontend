@@ -86,6 +86,10 @@ export const createAnnouncement = async (
     if (announcement_) {
       announcement_.firstName = announcement_.faculty_profiles?.first_name;
       announcement_.lastName = announcement_.faculty_profiles?.last_name;
+      // Ensure id is properly mapped from either 'id' or 'announcement_id'
+      if (!announcement_.id && announcement_.announcement_id) {
+        announcement_.id = announcement_.announcement_id;
+      }
     }
 
     return announcement_;
@@ -153,6 +157,10 @@ export const updateAnnouncement = async (
     if (announcement_) {
       announcement_.firstName = announcement_.faculty_profiles?.first_name;
       announcement_.lastName = announcement_.faculty_profiles?.last_name;
+      // Ensure id is properly mapped from either 'id' or 'announcement_id'
+      if (!announcement_.id && announcement_.announcement_id) {
+        announcement_.id = announcement_.announcement_id;
+      }
     }
 
     return announcement_;

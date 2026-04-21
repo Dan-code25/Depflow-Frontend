@@ -34,7 +34,7 @@ export function AnnouncementFilter({
           <button
             key={option.value}
             onClick={() => handleFilterChange(option.value)}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 cursor-pointer ${
               activeFilter === option.value
                 ? "bg-burgundy text-white shadow-sm"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"

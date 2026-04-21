@@ -82,7 +82,7 @@ export function AnnouncementCalendarFilter({
     <div className="relative inline-block">
       <button
         onClick={() => setShowCalendar(!showCalendar)}
-        className="px-5 py-3.5 bg-white border border-slate-300 hover:border-burgundy/40 rounded-lg text-charcoal font-semibold text-sm flex items-center gap-2.5 transition-all duration-200 shadow-sm hover:shadow-md"
+        className="px-5 py-3.5 bg-white border border-slate-300 hover:border-burgundy/40 rounded-lg text-charcoal font-semibold text-sm flex items-center gap-2.5 transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
       >
         <Calendar size={20} className="text-burgundy flex-shrink-0" />
         <span>
@@ -96,7 +96,7 @@ export function AnnouncementCalendarFilter({
           <div className="flex items-center justify-between mb-5">
             <button
               onClick={handlePrevMonth}
-              className="p-1.5 hover:bg-slate-100 rounded-md transition-colors text-slate-600"
+              className="p-1.5 hover:bg-slate-100 rounded-md transition-colors text-slate-600 cursor-pointer"
               title="Previous month"
             >
               <ChevronLeft size={20} />
@@ -104,7 +104,7 @@ export function AnnouncementCalendarFilter({
             <h3 className="text-sm font-semibold text-charcoal">{monthName}</h3>
             <button
               onClick={handleNextMonth}
-              className="p-1.5 hover:bg-slate-100 rounded-md transition-colors text-slate-600"
+              className="p-1.5 hover:bg-slate-100 rounded-md transition-colors text-slate-600 cursor-pointer"
               title="Next month"
             >
               <ChevronRight size={20} />
@@ -132,7 +132,7 @@ export function AnnouncementCalendarFilter({
               <button
                 key={day}
                 onClick={() => handleSelectDate(day)}
-                className={`py-1.5 text-xs font-medium rounded-md transition-all duration-200 h-8 flex items-center justify-center ${
+                className={`py-1.5 text-xs font-medium rounded-md transition-all duration-200 h-8 flex items-center justify-center cursor-pointer ${
                   isSelected(day)
                     ? "bg-burgundy text-white shadow-sm font-bold"
                     : isToday(day)
@@ -150,7 +150,7 @@ export function AnnouncementCalendarFilter({
             {selectedDate && (
               <button
                 onClick={handleClear}
-                className="flex-1 px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-md transition-colors text-sm font-medium flex items-center justify-center gap-1"
+                className="flex-1 px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-md transition-colors text-sm font-medium flex items-center justify-center gap-1 cursor-pointer"
               >
                 <X size={16} />
                 Clear
@@ -158,7 +158,7 @@ export function AnnouncementCalendarFilter({
             )}
             <button
               onClick={() => setShowCalendar(false)}
-              className={`flex-1 px-3 py-2 bg-burgundy text-white rounded-md hover:bg-burgundy/90 transition-colors text-sm font-medium ${
+              className={`flex-1 px-3 py-2 bg-burgundy text-white rounded-md hover:bg-burgundy/90 transition-colors text-sm font-medium cursor-pointer ${
                 !selectedDate ? "col-span-2" : ""
               }`}
             >

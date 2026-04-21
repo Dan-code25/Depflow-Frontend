@@ -176,7 +176,7 @@ export default function AdminAnnouncementsPage() {
                   setEditingAnnouncement(null);
                   setIsModalOpen(true);
                 }}
-                className="px-4 py-3 bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white rounded-lg transition-all duration-200 font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap"
+                className="px-4 py-3 bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white rounded-lg transition-all duration-200 font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap cursor-pointer"
               >
                 <Plus size={20} />
                 <span className="hidden sm:inline">Create</span>

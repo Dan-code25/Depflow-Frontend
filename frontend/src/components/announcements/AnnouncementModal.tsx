@@ -158,7 +158,7 @@ export function AnnouncementModal({
           <button
             onClick={handleClose}
             disabled={isLoading}
-            className="p-2 text-slate-400 hover:text-charcoal hover:bg-slate-100 rounded-lg transition-all duration-200 disabled:opacity-50"
+            className="p-2 text-slate-400 hover:text-charcoal hover:bg-slate-100 rounded-lg transition-all duration-200 disabled:opacity-50 cursor-pointer"
             aria-label="Close modal"
           >
             <X size={24} />
@@ -273,7 +273,7 @@ export function AnnouncementModal({
                     <button
                       type="button"
                       onClick={() => removeFile(index)}
-                      className="ml-3 flex-shrink-0 p-1.5 text-slate-400 hover:text-burgundy hover:bg-burgundy/10 rounded-md transition-all duration-200"
+                      className="ml-3 flex-shrink-0 p-1.5 text-slate-400 hover:text-burgundy hover:bg-burgundy/10 rounded-md transition-all duration-200 cursor-pointer"
                       disabled={isLoading}
                       title="Remove file"
                     >
@@ -298,7 +298,7 @@ export function AnnouncementModal({
               type="button"
               onClick={handleClose}
               disabled={isLoading}
-              className="px-5 py-2.5 text-slate-700 hover:text-charcoal hover:bg-slate-100 rounded-lg transition-all duration-200 font-semibold disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 text-slate-700 hover:text-charcoal hover:bg-slate-100 rounded-lg transition-all duration-200 font-semibold disabled:opacity-50 flex items-center gap-2 cursor-pointer"
             >
               <X size={18} />
               Cancel
@@ -306,7 +306,7 @@ export function AnnouncementModal({
             <button
               type="submit"
               disabled={isLoading}
-              className="px-6 py-2.5 bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white rounded-lg transition-all duration-200 font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md hover:shadow-lg"
+              className="px-6 py-2.5 bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white rounded-lg transition-all duration-200 font-semibold disabled:opacity-50 flex items-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
             >
               <Send size={20} />
               {isLoading

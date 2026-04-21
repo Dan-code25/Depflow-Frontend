@@ -38,7 +38,7 @@ export function AnnouncementSearch({
       {query && (
         <button
           onClick={handleClear}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-burgundy transition-colors"
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-burgundy transition-colors cursor-pointer"
           aria-label="Clear search"
         >
           <X size={20} />

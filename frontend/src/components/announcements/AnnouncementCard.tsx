@@ -60,7 +60,7 @@ export function AnnouncementCard({
                 {!isReadOnly && onEdit && (
                   <button
                     onClick={() => onEdit(announcement)}
-                    className="p-2 text-slate-400 hover:text-burgundy hover:bg-burgundy/5 rounded-md transition-all duration-200"
+                    className="p-2 text-slate-400 hover:text-burgundy hover:bg-burgundy/5 rounded-md transition-all duration-200 cursor-pointer"
                     aria-label="Edit announcement"
                   >
                     <Edit size={20} />
@@ -69,7 +69,7 @@ export function AnnouncementCard({
                 {!isReadOnly && onDelete && (
                   <button
                     onClick={handleDeleteClick}
-                    className="p-2 text-slate-400 hover:text-burgundy hover:bg-burgundy/5 rounded-md transition-all duration-200"
+                    className="p-2 text-slate-400 hover:text-burgundy hover:bg-burgundy/5 rounded-md transition-all duration-200 cursor-pointer"
                     aria-label="Delete announcement"
                   >
                     <Trash2 size={20} />
@@ -95,7 +95,7 @@ export function AnnouncementCard({
                       key={idx}
                       href={attachment.url}
                       download={attachment.filename}
-                      className="flex items-center gap-2 text-sm text-burgundy hover:text-burgundy/80 transition-colors"
+                      className="flex items-center gap-2 text-sm text-burgundy hover:text-burgundy/80 transition-colors cursor-pointer"
                     >
                       <span className="text-xs">📎</span>
                       <span className="truncate hover:underline">
