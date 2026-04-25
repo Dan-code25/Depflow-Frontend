@@ -15,8 +15,9 @@ import { LoadingSpinner } from "./components/common/LoadingSpinner";
 import ManageFacultyPage from "./pages/admin/ManageFacultyPage";
 import FacultyProfileViewPage from "./pages/admin/FacultyProfileViewPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
+import AdminManageSchedule from "./pages/admin/AdminManageSchedule";
 
-const cliendId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function AppRoutes() {
   const { isCheckingAuth } = useAutoLogin();
@@ -43,6 +44,9 @@ function AppRoutes() {
         <Route path="/admin/manage-faculty" element={<ManageFacultyPage />} />
         <Route path="/admin/faculty/:id" element={<FacultyProfileViewPage />} />
         <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+        <Route path="/admin/manage-schedule" element={<AdminManageSchedule />} />
+
+
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="faculty" />}>
@@ -70,7 +74,7 @@ function AppRoutes() {
 function App() {
   return (
     <BrowserRouter>
-      <GoogleOAuthProvider clientId={cliendId}>
+      <GoogleOAuthProvider clientId={clientId}>
         <AppRoutes />
       </GoogleOAuthProvider>
     </BrowserRouter>

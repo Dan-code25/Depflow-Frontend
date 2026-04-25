@@ -27,7 +27,7 @@ export function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
   const navItems = [
     { label: "Dashboard", icon: Home, path: "/admin/dashboard" },
     { label: "Manage Faculty", icon: Users, path: "/admin/manage-faculty" },
-    { label: "Manage Schedule", icon: Calendar, path: "/admin/schedule" },
+    { label: "Manage Schedule", icon: Calendar, path: "/admin/manage-schedule" },
     { label: "Announcements", icon: Megaphone, path: "/admin/announcements" },
     { label: "Analytics", icon: BarChart3, path: "/admin/analytics" },
     { label: "My Profile", icon: User, path: "/admin/profile" },
