@@ -8,7 +8,7 @@ import type { AddFacultyFormData } from "../types/faculty";
 
 export const getAllFaculty = async () => {
   try {
-    const response = await api.get("/faculty-information/all");
+    const response = await api.get("/faculty/all");
     console.log("Raw response:", response.data);
     // Map backend response to frontend format
     const mapped = response.data.map((item: BackendFaculty) => {
@@ -26,7 +26,7 @@ export const getAllFaculty = async () => {
 
 export const getFacultyById = async (facultyId: string) => {
   try {
-    const response = await api.get(`/faculty-information/profile/${facultyId}`);
+    const response = await api.get(`/faculty/profile/${facultyId}`);
     return mapBackendFaculty(response.data);
   } catch (error) {
     console.error("Error fetching faculty:", error);
@@ -44,7 +44,7 @@ export const addFaculty = async (facultyData: AddFacultyFormData) => {
     console.log("Backend data to send:", backendData);
 
     const response = await api.post(
-      "/faculty-information/add-faculty",
+      "/faculty/add-faculty",
       backendData,
     );
     // Map backend response to frontend format
@@ -57,7 +57,7 @@ export const addFaculty = async (facultyData: AddFacultyFormData) => {
 
 export const deleteFaculty = async (facultyId: string) => {
   try {
-    await api.delete(`/faculty-information/delete/${facultyId}`);
+    await api.delete(`/faculty/delete/${facultyId}`);
   } catch (error) {
     console.error("Error deleting faculty:", error);
     throw error;

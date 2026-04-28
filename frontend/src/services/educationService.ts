@@ -27,7 +27,7 @@ export const getEducations = async () => {
 export const getFacultyEducations = async (facultyId: string) => {
   try {
     const response = await api.get(
-      `/faculty-information/education/faculty/${facultyId}`,
+      `/faculty/education/faculty/${facultyId}`,
     );
     return response.data || [];
   } catch (error) {

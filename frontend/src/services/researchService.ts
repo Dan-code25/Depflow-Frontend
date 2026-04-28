@@ -26,7 +26,7 @@ export const getResearch = async () => {
 export const getFacultyResearch = async (facultyId: string) => {
   try {
     const response = await api.get(
-      `/faculty-information/research/faculty/${facultyId}`,
+      `/faculty/research/faculty/${facultyId}`,
     );
     const data = response.data;
 

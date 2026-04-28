@@ -41,7 +41,7 @@ export interface ScheduleAssignment {
  
 interface GeminiScheduleItem {
   faculty_id:        string;
-  subject_id:        string;
+  subject_id:        string; // This matches your subject_code in V2
   room_id:           string;
   day:               string;
   start_time:        string;
@@ -75,17 +75,7 @@ export interface GenerationResult {
   conflictsResolved:    string[];
   wasFixed:             boolean;
   facultyUtilization:   FacultyUtilization[];
-}
-
-export interface GenerationResult {
-  schedule:             ScheduleAssignment[];
-  reasoning:            string;
-  perProgramReasoning:  Record<string, string>;
-  apiCallsUsed:         1 | 2;
-  conflictsResolved:    string[];
-  wasFixed:             boolean;
-  facultyUtilization:   FacultyUtilization[];
-  missingEntries:       MissingEntry[];   // subjects required by curriculum but absent from schedule
+  missingEntries:       MissingEntry[]; // Keep this here
 }
  
 export interface ValidationIssue {
@@ -133,9 +123,24 @@ const getSubjectCode = (id: string): string =>
 const getRoomName = (id: string): string =>
   ROOM_LIST.find(x => x.id === id)?.room ?? id;
  
-const getPrefs = (facultyId: string): FacultyPreferences | null => {
-  const f = FACULTY_LIST.find(x => x.id === facultyId);
-  return f && "preferences" in f ? (f as any).preferences as FacultyPreferences : null;
+const getPrefs = (facultyId: string) => {
+  const faculty = FACULTY_LIST.find(f => f.id === facultyId);
+  if (!faculty) return null;
+  
+  const prefs = faculty.preferences ?? {};
+  
+  // ✅ Ensure all fields have defaults
+  return {
+    subjectSpecializations: prefs.subjectSpecializations ?? [],
+    unavailableDays:        prefs.unavailableDays        ?? [],
+    preferredDays:          prefs.preferredDays          ?? ["Monday","Tuesday","Wednesday","Thursday","Friday"],
+    unavailableTimeSlots:   prefs.unavailableTimeSlots   ?? [],
+    preferredTimeRange:     prefs.preferredTimeRange      ?? { start: "07:00", end: "18:00" },
+    preferredRoomTypes:     prefs.preferredRoomTypes      ?? ["lecture", "lab"],
+    priority:               prefs.priority                ?? "medium",
+    maxClassesPerDay:       prefs.maxClassesPerDay        ?? 3,
+    maxConsecutiveHours:    prefs.maxConsecutiveHours     ?? 4,
+  };
 };
  
 // ─────────────────────────────────────────────────────────────────────────────
@@ -309,20 +314,21 @@ ${hardRules}
  
 SECTIONS AND THEIR REQUIRED SUBJECTS (section|needs:[subjectIds]):
 ${curriculumBlock}
- 
+
 INSTRUCTIONS:
 - Produce exactly the entries listed above — no more, no fewer.
+- CRITICAL: For subject_id, you MUST use the exact id values from the SUBJECTS list above. For room_id, use exact id values from the ROOMS list. For faculty_id, use exact id values from the FACULTY list. NEVER invent, shorten, or guess IDs (e.g. do not use "cs101" or "2" — use the full exact id string provided).
 - CRITICAL: Use "faculty_id": "TBD" ONLY if mode=manual-faculty. For all other subjects, you MUST assign a real faculty_id.
 - FORBIDDEN: Do not use "TBA", "TBD", or "0" for room_id, day, or time slots. Every entry must have a valid value.
 - If a room/time conflict occurs, prioritize assigning the subject anyway; the Local Validator will flag it for the Fix Round.
-- SOFT RULE: Try to respect maxConsecutiveHours, but do not skip an assignment just to meet this rule. 
+- SOFT RULE: Try to respect maxConsecutiveHours, but do not skip an assignment just to meet this rule.
 - LOAD SPREADING: Ensure no qualified faculty is left with 0 units if there are subjects they can teach.
  
 SPLIT: If subject split=YES, output 2 entries with same session_group_id, different days, session_hours summing to units.
  
 OUTPUT — JSON only, no markdown:
-{"schedule":[{"faculty_id":"","subject_id":"","room_id":"","day":"","start_time":"HH:mm","end_time":"HH:mm","section":"BSCS 1-A","session_group_id":"","session_hours":0}],"reasoning":"","conflicts_resolved":[]}
- 
+{"schedule":[{"faculty_id":"<exact id from FACULTY list>","subject_id":"<exact id from SUBJECTS list>","room_id":"<exact id from ROOMS list>","day":"","start_time":"HH:mm","end_time":"HH:mm","section":"BSCS 1-A","session_group_id":"","session_hours":0}],"reasoning":"","conflicts_resolved":[]}
+
 Omit session_group_id and session_hours for non-split entries.
 JSON only.
 `.trim();
@@ -367,13 +373,12 @@ ROOMS: ${c.rooms.map(r => `id:${r.id} ${r.name}(${r.type})`).join("|")}
 SUBJECTS: ${c.subjects.map(s => `id:${s.id} ${s.code}(${s.facilityType})`).join("|")}
 DAYS: ${c.days.join(",")} SLOTS: ${c.timeSlots.join(",")}
  
-ID CONTRACT — follow exactly or the entry will be rejected:
-- faculty_id: bare id value only (e.g. "3", NOT "F3", NOT the name)
-- subject_id: bare id value only (e.g. "cs101", NOT "Scs101", NOT the code)
-- room_id:    bare id value only (e.g. "2", NOT "R2", NOT the room name)
- 
+- faculty_id: exact id from FACULTY list (e.g. "uuid-here")
+- subject_id: exact subject_code from SUBJECTS list (e.g. "COSC101")
+- room_id:    exact id from ROOMS list (e.g. "room-uuid-here")
+
 OUTPUT — JSON only:
-{"schedule":[{"faculty_id":"3","subject_id":"cs101","room_id":"2","day":"Monday","start_time":"08:00","end_time":"09:00","section":"","session_group_id":"","session_hours":0}],"reasoning":"","conflicts_resolved":[]}
+{"schedule":[{"faculty_id":"3","subject_id":"CC113-M","room_id":"2","day":"Monday","start_time":"08:00","end_time":"09:00","section":"","session_group_id":"","session_hours":0}],"reasoning":"","conflicts_resolved":[]}
 `.trim();
 }
  
@@ -692,10 +697,12 @@ export function validateLocally(sched: ScheduleAssignment[]): ValidationIssue[] 
 // ─────────────────────────────────────────────────────────────────────────────
 // GEMINI API CALLER
 // ─────────────────────────────────────────────────────────────────────────────
- 
-const GEMINI_MODEL   = "gemini-3.1-flash-lite-preview";
-const GEMINI_API_URL = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`;
- 
+// 1. Use the newer Gemini 2.5 Flash model (best for reasoning + JSON)
+const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${API_KEY}`;
+
+
 async function callGemini(prompt: string): Promise<GeminiScheduleResponse> {
  
   const response = await fetch(GEMINI_API_URL, {
@@ -886,67 +893,34 @@ function parseGeminiScheduleResponse(
 
 function normalizeGeminiItem(item: GeminiScheduleItem): GeminiScheduleItem {
   let { faculty_id, subject_id, room_id } = item;
- 
-  // ── faculty_id ────────────────────────────────────────────────────────────
-  // Gemini may return "F3", "f3", or the faculty's full name
-  const rawFaculty = String(faculty_id ?? "").trim();
-  if (rawFaculty && !FACULTY_LIST.find(f => f.id === rawFaculty)) {
-    // Try stripping leading "F" or "f"
-    const stripped = rawFaculty.replace(/^[Ff]/, "");
-    if (FACULTY_LIST.find(f => f.id === stripped)) {
-      faculty_id = stripped;
-    } else {
-      // Try matching by full name (case-insensitive)
-      const byName = FACULTY_LIST.find(f =>
-        `${f.personal.firstName} ${f.personal.lastName}`.toLowerCase() ===
-        rawFaculty.toLowerCase()
-      );
-      if (byName) faculty_id = byName.id;
-      else console.warn(`[DeptFlow] normalizeGeminiItem: unresolved faculty_id "${rawFaculty}"`);
-    }
-  }
- 
-  // ── subject_id ────────────────────────────────────────────────────────────
-  // Gemini may return "Scs101", "sCS101", or the subject code "CS 101"
+
+  // ── subject_id Normalization ──
   const rawSubject = String(subject_id ?? "").trim();
   if (rawSubject && !SUBJECT_LIST.find(s => s.id === rawSubject)) {
-    // Try stripping leading "S" or "s"
-    const stripped = rawSubject.replace(/^[Ss]/, "");
-    if (SUBJECT_LIST.find(s => s.id === stripped)) {
-      subject_id = stripped;
-    } else {
-      // Try matching by subject code (e.g. "CS 101" or "CS101")
-      const normalizedCode = rawSubject.replace(/\s+/g, " ").toUpperCase();
-      const byCode = SUBJECT_LIST.find(s =>
-        s.code.toUpperCase() === normalizedCode ||
-        s.code.replace(/\s+/g, "").toUpperCase() === normalizedCode.replace(/\s+/g, "")
-      );
-      if (byCode) subject_id = byCode.id;
-      else console.warn(`[DeptFlow] normalizeGeminiItem: unresolved subject_id "${rawSubject}"`);
-    }
+    const normalizedSearch = rawSubject.replace(/\s+/g, "").toUpperCase();
+    
+    const byCode = SUBJECT_LIST.find(s => {
+      // FIX: Add optional chaining and null check for s.code
+      const code = s.code?.replace(/\s+/g, "").toUpperCase();
+      return code === normalizedSearch;
+    });
+    
+    if (byCode) subject_id = byCode.id;
   }
- 
-  // ── room_id ───────────────────────────────────────────────────────────────
-  // Gemini may return "R2", "r2", or the room name "Lab 1"
+
+  // ── room_id Normalization ──
   const rawRoom = String(room_id ?? "").trim();
-  if (rawRoom && !(ROOM_LIST as any[]).find((r: any) => r.id === rawRoom)) {
-    // Try stripping leading "R" or "r"
-    const stripped = rawRoom.replace(/^[Rr]/, "");
-    if ((ROOM_LIST as any[]).find((r: any) => r.id === stripped)) {
-      room_id = stripped;
-    } else {
-      // Try matching by room name (case-insensitive)
-      const byName = (ROOM_LIST as any[]).find((r: any) =>
-        (r.room ?? "").toLowerCase() === rawRoom.toLowerCase()
-      );
-      if (byName) room_id = byName.id;
-      else console.warn(`[DeptFlow] normalizeGeminiItem: unresolved room_id "${rawRoom}"`);
-    }
+  if (rawRoom && !ROOM_LIST.find(r => r.id === rawRoom)) {
+    const byName = ROOM_LIST.find(r => 
+      // FIX: Ensure r.room exists before calling toLowerCase
+      (r.room || "").toLowerCase() === rawRoom.toLowerCase()
+    );
+    if (byName) room_id = byName.id;
   }
- 
+
   return { ...item, faculty_id, subject_id, room_id };
 }
- 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RESPONSE CONVERTER
 // ─────────────────────────────────────────────────────────────────────────────
@@ -964,15 +938,33 @@ function toScheduleAssignments(items: GeminiScheduleItem[]): ScheduleAssignment[
             (item.faculty_id === "TBD" || FACULTY_LIST.find(f => f.id === item.faculty_id)) &&
             SUBJECT_LIST.find(s => s.id === item.subject_id) &&
             (ROOM_LIST as any[]).find((r: any) => r.id === item.room_id)
+
   );
  
   const skipped = items.length - complete.length;
-  if (skipped > 0) {
+if (skipped > 0) {
+  // TEMPORARY DEBUG — shows exactly what Gemini returned that failed
+  const dropped = normalized.filter(
+    item => !(
+      item.faculty_id && item.subject_id && item.room_id &&
+      item.day && item.start_time && item.end_time && item.section &&
+      (item.faculty_id === "TBD" || FACULTY_LIST.find(f => f.id === item.faculty_id)) &&
+      SUBJECT_LIST.find(s => s.id === item.subject_id) &&
+      (ROOM_LIST as any[]).find((r: any) => r.id === item.room_id)
+    )
+  );
+  dropped.forEach(item => {
+    const facOk  = item.faculty_id === "TBD" || !!FACULTY_LIST.find(f => f.id === item.faculty_id);
+    const subOk  = !!SUBJECT_LIST.find(s => s.id === item.subject_id);
+    const roomOk = !!(ROOM_LIST as any[]).find((r: any) => r.id === item.room_id);
     console.warn(
-      `[DeptFlow] toScheduleAssignments: dropped ${skipped} entr${skipped === 1 ? "y" : "ies"} ` +
-      `with unresolvable IDs after normalization.`
+      `[DeptFlow] DROPPED → subject:"${item.subject_id}"(${subOk?"✓":"✗"}) ` +
+      `room:"${item.room_id}"(${roomOk?"✓":"✗"}) ` +
+      `faculty:"${item.faculty_id}"(${facOk?"✓":"✗"}) ` +
+      `section:${item.section}`
     );
-  }
+  });
+}
  
   return complete.map((item, idx) => ({
     id:               `gen-${Date.now()}-${idx}`,
@@ -1004,12 +996,13 @@ function buildProgramPrompt(
   const programSections = (c as any).sections.filter(
     (s: any) => s.program === programName
   );
- 
+
   const relevantSubjectIds = new Set(
     programSections.flatMap((s: any) => s.subjectIds)
   );
- 
-const facultyBlock = c.professors.map(p => {
+
+  // Aligned with faculty_v2 (personal and preferences JSONB)
+  const facultyBlock = c.professors.map(p => {
     const usedUnits = _currentSched
       .filter(s => s.faculty_id === p.id && s.day !== "TBD")
       .filter((s, _, arr) => {
@@ -1031,28 +1024,27 @@ const facultyBlock = c.professors.map(p => {
     );
   }).join("\n");
 
+  // Aligned with rooms_v2 table
   const roomBlock = c.rooms.map(r =>
     `id:${r.id} name:${r.name}|${r.type}|cap:${r.capacity}`
   ).join("\n");
- 
-  // Only include subjects used by this program — keeps prompt tight
-  // assignmentMode=manual-faculty → Gemini assigns room+time but sets faculty_id="TBD"
+
+  // Aligned with subjects_v2 table (subject_code, year_level, facility_type)
   const subjectBlock = c.subjects
     .filter(s => relevantSubjectIds.has(s.id))
     .map(s =>
       `id:${s.id} code:${s.code}|${s.units}u|${s.facilityType}` +
-      `|yr:${(s as any).yearLevel ?? "?"}|sem:${(s as any).semester ?? "?"}` +
-      `|mode:${(s as any).assignmentMode ?? "auto"}` +
+      `|yr:${s.yearLevel ?? "?"}|sem:${s.semester ?? "?"}` +
+      `|mode:${s.assignmentMode ?? "auto"}` +
       `|split:${s.canSplit ? s.splitPattern?.join("+") + "hrs" : "NO"}`
     ).join("\n");
- 
+
   const hardRules = c.rules
     .filter(r => r.startsWith("HARD") || r.startsWith("SPLIT") || r.startsWith("1 unit"))
     .map((r, i) => `${i + 1}. ${r}`)
     .join("\n");
- 
-  // Build an explicit numbered requirement list so Gemini has a concrete
-  // checklist to work from — reduces the chance of it "forgetting" subjects.
+
+  // Aligned with curriculum_v2 requirements
   let entryNum = 0;
   const requirementLines: string[] = [];
   programSections.forEach((sec: any) => {
@@ -1061,43 +1053,43 @@ const facultyBlock = c.professors.map(p => {
       const sub = c.subjects.find(s => s.id === subId);
       requirementLines.push(
         `${entryNum}. section="${sec.label}" subject_id="${subId}"` +
-        ` (${sub?.code ?? subId}, ${sub?.units ?? "?"}u, ${(sub as any)?.assignmentMode ?? "auto"})`
+        ` (${sub?.code ?? subId}, ${sub?.units ?? "?"}u, ${sub?.assignmentMode ?? "auto"})`
       );
     });
   });
   const requirementChecklist = requirementLines.join("\n");
   const totalEntries = entryNum;
- 
+
   const curriculumBlock = programSections.map((sec: any) =>
     `${sec.label}(Y${sec.year} Sem${sec.sem})|needs:[${sec.subjectIds.join(",")}]`
   ).join("\n");
- 
+
   return `
 You are a university schedule generator for TUP (Philippines). Schedule ${programName} ONLY.
 "reasoning"=2 sentences: (1) how load was distributed, (2) any faculty left unused and why. "conflicts_resolved"=[].
- 
+
 FACULTY:
 ${facultyBlock}
- 
+
 ROOMS:
 ${roomBlock}
- 
+
 SUBJECTS:
 ${subjectBlock}
- 
+
 DAYS: ${c.days.join(",")}
 SLOTS: ${c.timeSlots.join(",")}
- 
+
 HARD RULES:
 ${hardRules}
- 
+
 ${programName} SECTIONS (section|needs:[subjectIds]):
 ${curriculumBlock}
- 
+
 REQUIRED ENTRIES — you MUST produce one schedule entry for EVERY line below (${totalEntries} total).
 Do not skip any. Each line = one required output entry.
 ${requirementChecklist}
- 
+
 INSTRUCTIONS:
 - Produce exactly the entries listed above — no more, no fewer.
 - CRITICAL: Use "faculty_id": "TBD" ONLY if mode=manual-faculty. For all other subjects, you MUST assign a real faculty_id.
@@ -1105,19 +1097,18 @@ INSTRUCTIONS:
 - If a room/time conflict occurs, prioritize assigning the subject anyway; the Local Validator will flag it for the Fix Round.
 - SOFT RULE: Try to respect maxConsecutiveHours, but do not skip an assignment just to meet this rule. 
 - LOAD SPREADING: Ensure no qualified faculty is left with 0 units if there are subjects they can teach.
- 
+
 ID CONTRACT — follow exactly or the entry will be rejected:
-- faculty_id: use the bare "id" value shown in FACULTY (e.g. "3", NOT "F3", NOT the name)
-- subject_id: use the bare "id" value shown in SUBJECTS (e.g. "cs101", NOT "Scs101", NOT the code)
-- room_id:    use the bare "id" value shown in ROOMS (e.g. "2", NOT "R2", NOT the room name)
- 
+- faculty_id: use the bare "id" value shown in FACULTY (e.g. "fac-001", NOT "F1")
+- subject_id: use the bare "id" value shown in SUBJECTS (e.g. "COSC101")
+- room_id:    use the bare "id" value shown in ROOMS (e.g. "room-lec-1")
+
 OUTPUT — JSON only:
-{"schedule":[{"faculty_id":"3","subject_id":"cs101","room_id":"2","day":"Monday","start_time":"08:00","end_time":"09:00","section":"${programName} 1-A"}],"reasoning":"","conflicts_resolved":[]}
- 
+{"schedule":[{"faculty_id":"fac-001","subject_id":"COSC101","room_id":"room-lec-1","day":"Monday","start_time":"08:00","end_time":"11:00","section":"${programName} 1-A"}],"reasoning":"","conflicts_resolved":[]}
+
 Omit session_group_id/session_hours for non-split. JSON only.
 `.trim();
 }
- 
 // ─────────────────────────────────────────────────────────────────────────────
 // FACULTY UTILIZATION BUILDER
 // Computes per-faculty unit usage, subject list, and reason for non-utilization.
@@ -1443,52 +1434,105 @@ export async function generateSchedule(
   };
 
   const [facRes, subRes, roomRes, currRes] = await Promise.all([
-    fetch("http://localhost:3000/api/faculty/all", { headers }),
-    fetch("http://localhost:3000/api/subjects", { headers }),
-    fetch("http://localhost:3000/api/rooms", { headers }),
-    fetch("http://localhost:3000/api/curriculums", { headers })
-  ]);
-
+  fetch("http://localhost:3000/api/manage-schedule/faculty", { headers }),
+  fetch("http://localhost:3000/api/manage-schedule/subjects", { headers }),
+  fetch("http://localhost:3000/api/manage-schedule/rooms", { headers }),
+  fetch("http://localhost:3000/api/manage-schedule/curriculums", { headers })
+]);
   const rawFac = await facRes.json();
   const rawSub = await subRes.json();
   const rawRoom = await roomRes.json();
+  const rawCurr = await currRes.json();
 
-  // Populate the variables so the rest of the file can use them normally!
-  FACULTY_LIST = rawFac.map((f: any) => ({
-    id: f.faculty_id || f.id,
+
+  
+console.log("[DEBUG] rawFac:", JSON.stringify(rawFac).slice(0, 200));
+console.log("[DEBUG] rawSub:", JSON.stringify(rawSub).slice(0, 200));
+console.log("[DEBUG] rawRoom:", JSON.stringify(rawRoom).slice(0, 200));
+console.log("[DEBUG] rawCurr:", JSON.stringify(rawCurr).slice(0, 200));
+
+  // Helper to unwrap API responses that may be wrapped in {data:[...]} or similar
+  const unwrapArray = (response: any): any[] => {
+    if (Array.isArray(response)) return response;
+    if (response?.data && Array.isArray(response.data)) return response.data;
+    if (response?.rooms && Array.isArray(response.rooms)) return response.rooms;
+    if (response?.faculty && Array.isArray(response.faculty)) return response.faculty;
+    if (response?.subjects && Array.isArray(response.subjects)) return response.subjects;
+    console.warn("[DeptFlow] Unexpected API response format:", response);
+    return [];
+  };
+
+const facArray = unwrapArray(rawFac);
+  const subArray = unwrapArray(rawSub);
+  const roomArray = unwrapArray(rawRoom);
+  const currArray = unwrapArray(rawCurr);
+
+  // 1. FACULTY_LIST Mapping (Handles JSONB fields)
+FACULTY_LIST = facArray.filter((f: any) => {
+  // Handle both flat columns AND JSONB personal object
+  const status = f.personal
+    ? (typeof f.personal === 'string' ? JSON.parse(f.personal) : f.personal)?.status
+    : f.status;
+  return status === "Active" || !status; // include if no status field
+}).map((f: any) => {
+  const personal = f.personal
+    ? (typeof f.personal === 'string' ? JSON.parse(f.personal) : f.personal)
+    : null;
+  const prefs = f.preferences
+    ? (typeof f.preferences === 'string' ? JSON.parse(f.preferences) : f.preferences)
+    : null;
+
+  return {
+    id: f.id || f.faculty_id,  // ✅ handles faculty_id column
     personal: {
-      firstName: f.first_name || f.firstName,
-      lastName: f.last_name || f.lastName,
-      employmentType: f.employment_type || f.employmentType,
-      designation: f.designation
+      firstName:      personal?.firstName      ?? f.first_name,
+      lastName:       personal?.lastName       ?? f.last_name,
+      employmentType: personal?.employmentType ?? f.employment_type ?? "Full-time",
+      status:         personal?.status         ?? f.status          ?? "Active",
     },
-    preferences: f.preferences || {
-      subjectSpecializations: rawSub.map((s:any) => s.code || s.subject_code),
-      unavailableDays: [], preferredDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-      unavailableTimeSlots: [], preferredTimeRange: { start: "07:00", end: "18:00" },
-      preferredRoomTypes: ["lab", "lecture"], priority: "medium", maxClassesPerDay: 3, maxConsecutiveHours: 4
+    preferences: prefs ?? {
+      subjectSpecializations: subArray.map((s: any) => s.subject_code ?? s.code),
+      unavailableDays:        [],
+      preferredDays:          ["Monday","Tuesday","Wednesday","Thursday","Friday"],
+      unavailableTimeSlots:   [],
+      preferredTimeRange:     { start: "07:00", end: "18:00" },
+      preferredRoomTypes:     ["lab","lecture"],
+      priority:               "medium",
+      maxClassesPerDay:       3,
+      maxConsecutiveHours:    4,
     }
+  };
+});
+
+  // 2. SUBJECT_LIST Mapping (Matches V2 Column Names)
+SUBJECT_LIST = subArray.map((s: any) => ({
+  id:             (s.subject_code ?? s.code ?? "").trim(),  // ✅ handles both + trims \n
+  code:           (s.subject_code ?? s.code ?? "").trim(),
+  name:           s.subject_name  ?? s.name,
+  units:          s.units ?? 0,
+  yearLevel:      s.year_level    ?? s.yearLevel,
+  semester:       s.semester,
+  programs:       s.programs      ?? [],
+  facilityType:   s.facility_type ?? s.facilityType   ?? "lecture",
+  assignmentMode: s.assignment_mode ?? s.assignmentMode ?? "auto",
+  canSplit:       s.can_split     ?? s.canSplit        ?? false,
+  splitPattern:   s.split_pattern ?? s.splitPattern   ?? null,
+}));
+
+  // 3. ROOM_LIST Mapping (Matches V2 Column Names)
+  ROOM_LIST = roomArray.map((r: any) => ({
+    id:       r.id,
+    room:     r.room, // Matches 'room' column in rooms_v2
+    type:     r.type,
+    capacity: r.capacity ?? 40,
   }));
 
-  SUBJECT_LIST = rawSub.map((s: any) => ({
-    id: s.code || s.subject_code,
-    code: s.code || s.subject_code,
-    name: s.name || s.subject_name,
-    units: s.units,
-    facilityType: s.facilityType || "lecture", 
-    assignmentMode: s.assignmentMode || "auto",
-    canSplit: s.canSplit || false,
+  // 4. CURRICULUM Mapping (Parses JSONB sections)
+  CURRICULUM = currArray.map((c: any) => ({
+    ...c,
+    // CRITICAL: curriculum_v2 stores sections as JSONB
+    sections: typeof c.sections === 'string' ? JSON.parse(c.sections) : (c.sections || [])
   }));
-
-  ROOM_LIST = rawRoom.map((r: any) => ({
-    id: r.id || r.room_id,
-    room: r.roomNo || r.room_no || r.room,
-    type: r.type || (r.is_lab ? "lab" : "lecture"),
-    capacity: r.capacity || 40
-  }));
-
-  CURRICULUM = await currRes.json();
-  // ──────────────────────────────────────────────────────────────────
 
   const { sem = 1 } = options;
   const constraints = buildConstraints(sem);

@@ -46,7 +46,7 @@ export const getProfilePicture = async () => {
 export const getFacultyProfilePicture = async (facultyId: string) => {
   try {
     const response = await api.get(
-      `/faculty-information/profile-picture/${facultyId}`,
+      `/faculty/profile-picture/${facultyId}`,
     );
     console.log("Fetched faculty profile picture:", response.data);
 

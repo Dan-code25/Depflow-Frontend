@@ -1429,67 +1429,83 @@ export default function ManageSchedule() {
     sem: 1,
   });
 
-  // ── NEW: Fetch Data from Database on Mount ─────────────────────────────────
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const headers = {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        };
 
-        const [facRes, subRes, roomRes, schedRes] = await Promise.all([
-          fetch("http://localhost:3000/api/faculty/all", { headers }),
-          fetch("http://localhost:3000/api/subjects", { headers }),
-          fetch("http://localhost:3000/api/rooms", { headers }),
-          fetch("http://localhost:3000/api/schedules", { headers })
-        ]);
+const API_BASE = "http://localhost:3000/api/manage-schedule";
+useEffect(() => {
+  const loadData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const headers = {
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {})
+      };
 
-        FACULTY_LIST = (await facRes.json()).map((f: any) => ({
-          id: f.faculty_id || f.id,
-          personal: {
-            firstName: f.first_name || f.firstName,
-            lastName: f.last_name || f.lastName,
-            employmentType: f.employment_type || f.employmentType,
-            designation: f.designation
-          }
-        }));
+      const [facRes, subRes, roomRes, schedRes] = await Promise.all([
+        fetch(`${API_BASE}/faculty`, { headers }),
+        fetch(`${API_BASE}/subjects`, { headers }),
+        fetch(`${API_BASE}/rooms`, { headers }),
+        fetch(`${API_BASE}/schedules`, { headers })
+      ]);
 
-        SUBJECT_LIST = (await subRes.json()).map((s: any) => ({
-          id: s.code || s.subject_code,
-          code: s.code || s.subject_code,
-          name: s.name || s.subject_name,
-          units: s.units
-        }));
+      const toArray = (d: any) =>
+        Array.isArray(d) ? d : d?.data ?? d?.items ?? d?.result ?? [];
 
-        ROOM_LIST = (await roomRes.json()).map((r: any) => ({
-          id: r.id || r.room_id,
-          room: r.roomNo || r.room_no || r.room
-        }));
-        
-      
+      const facData   = toArray(await facRes.json());
+      const subData   = toArray(await subRes.json());
+      const roomData  = toArray(await roomRes.json());
+      const schedData = toArray(await schedRes.json());
 
-        setSchedules((await schedRes.json()).map((s: any) => ({
-          id: s.id || s.schedule_id,
-          faculty_id: s.facultyId || s.faculty_id,
-          subject_id: s.subjectCode || s.subject_code,
-          room_id: s.roomId || s.room_id,
-          day: s.day || s.day_of_week,
-          start_time: s.startTime || s.start_time,
-          end_time: s.endTime || s.end_time,
-          section: s.section,
-          status: s.status || "draft"
-        })));
+      FACULTY_LIST = facData.map((f: any) => ({
+        id: f.id,
+        personal: f.personal ?? {
+          firstName:      f.first_name      || f.firstName,
+          lastName:       f.last_name       || f.lastName,
+          employmentType: f.employment_type || f.employmentType,
+          status:         f.status          ?? "Active",
+        },
+        preferences: f.preferences ?? {}
+      }));
 
-        setIsDataLoaded(true);
-      } catch (error) {
-        console.error("Failed to load database records:", error);
-      }
-    };
-    
-    loadData();
-  }, []);
+      SUBJECT_LIST = subData.map((s: any) => ({
+        id:             s.subject_code,
+        code:           s.subject_code,
+        name:           s.subject_name,
+        units:          s.units,
+        facilityType:   s.facility_type   ?? "lecture",
+        assignmentMode: s.assignment_mode ?? "auto",
+        canSplit:       s.can_split       ?? false,
+        splitPattern:   s.split_pattern   ?? null,
+      }));
+
+      ROOM_LIST = roomData.map((r: any) => ({
+        id:       r.id,
+        room:     r.room,
+        type:     r.type     ?? "lecture",
+        capacity: r.capacity ?? 40,
+      }));
+
+      setSchedules(schedData.map((s: any) => ({
+        id:               s.id,
+        faculty_id:       s.faculty_id,
+        subject_id:       s.subject_id,
+        room_id:          s.room_id,
+        day:              s.day,
+        start_time:       s.start_time,
+        end_time:         s.end_time,
+        section:          s.section,
+        status:           s.status          ?? "draft",
+        session_group_id: s.session_group_id,
+        session_hours:    s.session_hours,
+      })));
+
+      setIsDataLoaded(true);
+    } catch (error) {
+      console.error("Failed to load database records:", error);
+    }
+  };
+
+  loadData();
+}, []);
 
   // ── Derived values ─────────────────────────────────────────────────────────
   const drafts    = schedules.filter(s=>s.status==="draft").length;
@@ -1514,62 +1530,64 @@ export default function ManageSchedule() {
   const openDelete = (s:ScheduleAssignment) => { setSelected(s); setModal("delete"); };
   const closeModal = () => { setModal(null); setSelected(null); };
 
-  const handleSave = async (entry: ScheduleAssignment) => {
-    try {
-      const token = localStorage.getItem("token");
-      const headers = {
-        "Content-Type": "application/json",
-        ...(token ? { "Authorization": `Bearer ${token}` } : {})
-      };
+const handleSave = async (entry: ScheduleAssignment) => {
+  try {
+    const token = localStorage.getItem("token");
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {})
+    };
 
-      const payload = {
-        faculty_id: entry.faculty_id,
-        subject_code: entry.subject_id,
-        room_id: entry.room_id,
-        period_id: 1, 
-        day_of_week: entry.day,
-        start_time: entry.start_time,
-        end_time: entry.end_time,
-        section: entry.section,
-        is_ai_generated: false
-      };
+    const payload = {
+      faculty_id:       entry.faculty_id,
+      subject_id:       entry.subject_id,
+      room_id:          entry.room_id,
+      day:              entry.day,
+      start_time:       entry.start_time,
+      end_time:         entry.end_time,
+      section:          entry.section,
+      status:           entry.status ?? "draft",
+      session_group_id: entry.session_group_id,
+      session_hours:    entry.session_hours,
+    };
 
-      if (modal === "edit") {
-        await fetch(`http://localhost:3000/api/schedules/${entry.id}`, {
-          method: "PATCH", headers, body: JSON.stringify(payload)
-        });
-        setSchedules(p => p.map(s => s.id === entry.id ? entry : s));
-      } else {
-        const res = await fetch(`http://localhost:3000/api/schedules`, {
-          method: "POST", headers, body: JSON.stringify(payload)
-        });
-        const savedData = await res.json();
-        setSchedules(p => [...p, { ...entry, id: savedData.schedule_id || savedData.id }]);
-      }
-      setScanned(false);
-      closeModal();
-    } catch (error) {
-      console.error("Save failed:", error);
-      alert("Failed to save schedule to database.");
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!selected) return;
-    try {
-      const token = localStorage.getItem("token");
-      await fetch(`http://localhost:3000/api/schedules/${selected.id}`, {
-        method: "DELETE",
-        headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) }
+    if (modal === "edit") {
+      await fetch(`${API_BASE}/schedules/${entry.id}`, {
+        method: "PATCH", headers, body: JSON.stringify(payload)
       });
-      setSchedules(p=>p.filter(s=>s.id!==selected.id));
-      setScanned(false);
-      closeModal();
-    } catch (error) {
-      console.error("Delete failed:", error);
-      alert("Failed to delete schedule from database.");
+      setSchedules(p => p.map(s => s.id === entry.id ? entry : s));
+    } else {
+      const res = await fetch(`${API_BASE}/schedules`, {
+        method: "POST", headers, body: JSON.stringify(payload)
+      });
+      const savedData = await res.json();
+      setSchedules(p => [...p, { ...entry, id: savedData.id }]);
     }
-  };
+
+    setScanned(false);
+    closeModal();
+  } catch (error) {
+    console.error("Save failed:", error);
+    alert("Failed to save schedule to database.");
+  }
+};
+
+const handleDelete = async () => {
+  if (!selected) return;
+  try {
+    const token = localStorage.getItem("token");
+    await fetch(`${API_BASE}/schedules/${selected.id}`, {
+      method: "DELETE",
+      headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) }
+    });
+    setSchedules(p => p.filter(s => s.id !== selected.id));
+    setScanned(false);
+    closeModal();
+  } catch (error) {
+    console.error("Delete failed:", error);
+    alert("Failed to delete schedule from database.");
+  }
+};
 
   const handleApplyFix = (fix: Conflict["fix"]) => {
     if (!fix) return;
@@ -1606,31 +1624,65 @@ export default function ManageSchedule() {
   const [generating, setGenerating] = useState(false);
 
   const handleGenerate = async () => {
-    setGenerating(true);
-    try {
-      const result = await generateSchedule({ sem: activeSem.sem });
-      setSchedules(result.schedule);
-      setScanned(false);
-      // FIX 4: save reasoning so the modal can be opened/reopened at any time
-      setLastReasoning({
-        perProgram:     result.perProgramReasoning,
-        utilization:    result.facultyUtilization,
-        missingEntries: result.missingEntries,
-        wasFixed:       result.wasFixed,
-        apiCalls:       result.apiCallsUsed,
-        sem:            activeSem.sem,
-        schoolYear:     activeSem.schoolYear,
+  setGenerating(true);
+  try {
+    const result = await generateSchedule({ sem: activeSem.sem });
+    
+    // 1. Get your auth token
+    const token = localStorage.getItem("token");
+    const headers = {
+      "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {})
+    };
+
+    // 2. Persist the generated schedule to the database
+    // Note: If your API supports bulk insert, use that instead of a loop for better performance.
+    const savePromises = result.schedule.map(entry => {
+      const payload = {
+        faculty_id:       entry.faculty_id,
+        subject_id:       entry.subject_id,
+        room_id:          entry.room_id,
+        day:              entry.day,
+        start_time:       entry.start_time,
+        end_time:         entry.end_time,
+        section:          entry.section,
+        status:           "draft", // Always save as draft initially
+        session_group_id: entry.session_group_id,
+        session_hours:    entry.session_hours,
+      };
+      return fetch(`${API_BASE}/schedules`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload)
       });
-      // Auto-open reasoning modal so admin sees it immediately after generation
-      setModal("reasoning");
-      console.log(`[DeptFlow] Schedule generated in ${result.apiCallsUsed} API call(s).`);
-    } catch (err) {
-      console.error("[DeptFlow] Schedule generation failed:", err);
-      alert("Schedule generation failed. Check the console for details.");
-    } finally {
-      setGenerating(false);
-    }
-  };
+    });
+
+    await Promise.all(savePromises);
+
+    // 3. Refresh the local state from the database to get the real IDs
+    const refreshRes = await fetch(`${API_BASE}/schedules`, { headers });
+    const freshData = await refreshRes.json();
+    setSchedules(Array.isArray(freshData) ? freshData : freshData.data || []);
+
+    setScanned(false);
+    setLastReasoning({
+      perProgram:     result.perProgramReasoning,
+      utilization:    result.facultyUtilization,
+      missingEntries: result.missingEntries,
+      wasFixed:       result.wasFixed,
+      apiCalls:       result.apiCallsUsed,
+      sem:            activeSem.sem,
+      schoolYear:     activeSem.schoolYear,
+    });
+    
+    setModal("reasoning");
+  } catch (err) {
+    console.error("Persistence failed:", err);
+    alert("Schedule generated but failed to save to database.");
+  } finally {
+    setGenerating(false);
+  }
+};
   // ✏️ EDIT — replace the setTimeout with your actual Supabase + Gemini API call
 
 // REPLACE WITH:

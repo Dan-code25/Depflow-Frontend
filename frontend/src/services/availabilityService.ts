@@ -68,7 +68,7 @@ export const getFacultyAvailability = async (
 ): Promise<Availability | null> => {
   try {
     const response = await api.get(
-      `/faculty-information/availability/faculty/${facultyId}`,
+      `/faculty/availability/faculty/${facultyId}`,
     );
     return response.data || null;
   } catch (error) {

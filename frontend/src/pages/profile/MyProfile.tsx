@@ -210,7 +210,7 @@ export default function MyProfile() {
 
     try {
       // Store the credential in case we need to restore it
-      const deletedCredential = credentials.find((c) => c.id === id);
+
 
       // Remove from state immediately (optimistic)
       setCredentials((prev) => prev.filter((c) => c.id !== id));
@@ -286,7 +286,7 @@ export default function MyProfile() {
 
     try {
       // Store the research in case we need to restore it
-      const deletedResearch = researches.find((r) => r.researchId === id);
+
 
       // Remove from state immediately (optimistic)
       setResearches((prev) => prev.filter((r) => r.researchId !== id));

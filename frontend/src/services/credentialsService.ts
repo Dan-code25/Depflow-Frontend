@@ -66,7 +66,7 @@ export const getCredentials = async () => {
 export const getFacultyCredentials = async (facultyId: string) => {
   try {
     const response = await api.get(
-      `/faculty-information/credentials/faculty/${facultyId}`,
+      `/faculty/credentials/faculty/${facultyId}`,
     );
     const data = response.data;
 
