@@ -15,7 +15,8 @@
 //   ✓ Full local conflict/constraint validation (free, no API cost)
 //   ✓ Hybrid flow: generate → validate → fix if needed (max 2 API calls)
 // ─────────────────────────────────────────────────────────────────────────────
- 
+import api from "../services/api"; 
+
 let FACULTY_LIST: any[] = [];
 let SUBJECT_LIST: any[] = [];
 let ROOM_LIST: any[] = [];
@@ -1425,38 +1426,31 @@ export interface GenerateScheduleOptions {
 export async function generateSchedule(
   options: GenerateScheduleOptions = {}
 ): Promise<GenerationResult> {
-  // ── NEW: FETCH FROM LOCAL SERVER FIRST ──────────────────────────────
   console.log("[DeptFlow] Fetching latest data from database...");
-  const token = localStorage.getItem("token");
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token ? { "Authorization": `Bearer ${token}` } : {})
-  };
 
   const [facRes, subRes, roomRes, currRes] = await Promise.all([
-  fetch("http://localhost:3000/api/manage-schedule/faculty", { headers }),
-  fetch("http://localhost:3000/api/manage-schedule/subjects", { headers }),
-  fetch("http://localhost:3000/api/manage-schedule/rooms", { headers }),
-  fetch("http://localhost:3000/api/manage-schedule/curriculums", { headers })
-]);
-  const rawFac = await facRes.json();
-  const rawSub = await subRes.json();
-  const rawRoom = await roomRes.json();
-  const rawCurr = await currRes.json();
+    api.get("/manage-schedule/faculty"),
+    api.get("/manage-schedule/subjects"),
+    api.get("/manage-schedule/rooms"),
+    api.get("/manage-schedule/curriculums"),
+  ]);
 
+  const rawFac  = facRes.data;
+  const rawSub  = subRes.data;
+  const rawRoom = roomRes.data;
+  const rawCurr = currRes.data;
 
-  
-console.log("[DEBUG] rawFac:", JSON.stringify(rawFac).slice(0, 200));
-console.log("[DEBUG] rawSub:", JSON.stringify(rawSub).slice(0, 200));
-console.log("[DEBUG] rawRoom:", JSON.stringify(rawRoom).slice(0, 200));
-console.log("[DEBUG] rawCurr:", JSON.stringify(rawCurr).slice(0, 200));
+  console.log("[DEBUG] rawFac:",  JSON.stringify(rawFac).slice(0, 200));
+  console.log("[DEBUG] rawSub:",  JSON.stringify(rawSub).slice(0, 200));
+  console.log("[DEBUG] rawRoom:", JSON.stringify(rawRoom).slice(0, 200));
+  console.log("[DEBUG] rawCurr:", JSON.stringify(rawCurr).slice(0, 200));
 
-  // Helper to unwrap API responses that may be wrapped in {data:[...]} or similar
+  // Helper to unwrap API responses
   const unwrapArray = (response: any): any[] => {
     if (Array.isArray(response)) return response;
-    if (response?.data && Array.isArray(response.data)) return response.data;
-    if (response?.rooms && Array.isArray(response.rooms)) return response.rooms;
-    if (response?.faculty && Array.isArray(response.faculty)) return response.faculty;
+    if (response?.data     && Array.isArray(response.data))     return response.data;
+    if (response?.rooms    && Array.isArray(response.rooms))    return response.rooms;
+    if (response?.faculty  && Array.isArray(response.faculty))  return response.faculty;
     if (response?.subjects && Array.isArray(response.subjects)) return response.subjects;
     console.warn("[DeptFlow] Unexpected API response format:", response);
     return [];
