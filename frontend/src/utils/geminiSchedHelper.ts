@@ -199,9 +199,11 @@ function buildConstraints(semFilter: 1 | 2 = 1) {
       splitPattern:   (s as any).splitPattern    ?? null,
       notes:          (s as any).notes           ?? "",
     })),
- 
+
     days:      DAYS,
     timeSlots: TIME_SLOTS,
+
+    
  
     // Curriculum — flat sections array filtered to the requested semester only.
     // New structure: each program has a sections[] array where every entry

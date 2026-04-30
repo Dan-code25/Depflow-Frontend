@@ -10,6 +10,7 @@
 //
 // EDITABLE SECTIONS are marked with: // ✏️ EDIT
 // ─────────────────────────────────────────────────────────────────────────────
+import api from "../../services/api"; // adjust path if needed
 import { AdminLayout } from "../../components/layout/AdminLayout";
 
 import { useState, useMemo, useEffect } from "react";
@@ -1431,29 +1432,24 @@ export default function ManageSchedule() {
 
 
 const API_BASE = "http://localhost:3000/api/manage-schedule";
+
 useEffect(() => {
   const loadData = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const headers = {
-        "Content-Type": "application/json",
-        ...(token ? { "Authorization": `Bearer ${token}` } : {})
-      };
-
       const [facRes, subRes, roomRes, schedRes] = await Promise.all([
-        fetch(`${API_BASE}/faculty`, { headers }),
-        fetch(`${API_BASE}/subjects`, { headers }),
-        fetch(`${API_BASE}/rooms`, { headers }),
-        fetch(`${API_BASE}/schedules`, { headers })
+        api.get("/manage-schedule/faculty"),
+        api.get("/manage-schedule/subjects"),
+        api.get("/manage-schedule/rooms"),
+        api.get("/manage-schedule/schedules"),
       ]);
 
       const toArray = (d: any) =>
         Array.isArray(d) ? d : d?.data ?? d?.items ?? d?.result ?? [];
 
-      const facData   = toArray(await facRes.json());
-      const subData   = toArray(await subRes.json());
-      const roomData  = toArray(await roomRes.json());
-      const schedData = toArray(await schedRes.json());
+      const facData  = toArray(facRes.data);
+      const subData  = toArray(subRes.data);
+      const roomData = toArray(roomRes.data);
+      const schedData = toArray(schedRes.data);
 
       FACULTY_LIST = facData.map((f: any) => ({
         id: f.id,
@@ -1538,17 +1534,55 @@ const handleSave = async (entry: ScheduleAssignment) => {
       ...(token ? { "Authorization": `Bearer ${token}` } : {})
     };
 
+    // Fetch academic periods to get period_id
+    const periodsRes = await fetch("http://localhost:3000/api/academic-periods", { headers });
+    const periodsArray = await periodsRes.json();
+    const periods = Array.isArray(periodsArray) ? periodsArray : periodsArray?.data || [];
+    
+    // For now, use the first available period or current period
+    let period = periods.find((p: any) => p.is_current || p.isCurrent) || periods[0];
+
+    // If no period exists, create one automatically
+    if (!period) {
+      try {
+        const createRes = await fetch("http://localhost:3000/api/academic-periods", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            academic_year: "2024-2025",
+            semester: "1",  // ✅ convert to string
+            is_current: true,
+          }),
+        });
+        period = await createRes.json();
+      } catch (err) {
+        console.error("Failed to create academic period:", err);
+        alert("No academic period found and failed to create one.");
+        return;
+      }
+    }
+
+    const periodId = period?.period_id || period?.id;
+
+    if (!periodId) {
+      alert("No academic period found. Please create one first.");
+      return;
+    }
+
+    // Find subject to get subject_code
+    const subject = SUBJECT_LIST.find((s: any) => s.id === entry.subject_id);
+    const subjectCode = subject?.code || entry.subject_id;
+
     const payload = {
       faculty_id:       entry.faculty_id,
-      subject_id:       entry.subject_id,
+      subject_code:     subjectCode,  // ✅ use subject_code not subject_id
       room_id:          entry.room_id,
-      day:              entry.day,
+      period_id:        periodId,     // ✅ required
+      day_of_week:      entry.day,    // ✅ use day_of_week not day
       start_time:       entry.start_time,
       end_time:         entry.end_time,
       section:          entry.section,
-      status:           entry.status ?? "draft",
-      session_group_id: entry.session_group_id,
-      session_hours:    entry.session_hours,
+      is_ai_generated:  false,        // ✅ manually added
     };
 
     if (modal === "edit") {
@@ -1624,65 +1658,107 @@ const handleDelete = async () => {
   const [generating, setGenerating] = useState(false);
 
   const handleGenerate = async () => {
-  setGenerating(true);
-  try {
-    const result = await generateSchedule({ sem: activeSem.sem });
-    
-    // 1. Get your auth token
-    const token = localStorage.getItem("token");
-    const headers = {
-      "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    };
+    setGenerating(true);
+    try {
+      // 1. Fetch academic periods and find matching period_id
+      const periodsRes = await api.get("/academic-periods");
+      const periodsArray = Array.isArray(periodsRes.data) ? periodsRes.data : periodsRes.data?.data ?? [];
 
-    // 2. Persist the generated schedule to the database
-    // Note: If your API supports bulk insert, use that instead of a loop for better performance.
-    const savePromises = result.schedule.map(entry => {
-      const payload = {
-        faculty_id:       entry.faculty_id,
-        subject_id:       entry.subject_id,
-        room_id:          entry.room_id,
-        day:              entry.day,
-        start_time:       entry.start_time,
-        end_time:         entry.end_time,
-        section:          entry.section,
-        status:           "draft", // Always save as draft initially
-        session_group_id: entry.session_group_id,
-        session_hours:    entry.session_hours,
-      };
-      return fetch(`${API_BASE}/schedules`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload)
+      const expectedSem = activeSem.sem === 1 ? "1st Semester" : "2nd Semester";
+
+      let matchingPeriod = periodsArray.find((p: any) =>
+        p.academicYear === activeSem.schoolYear && p.semester === expectedSem
+      );
+
+      if (!matchingPeriod) {
+        console.log(`[DEBUG] Creating period: ${activeSem.schoolYear} ${expectedSem}`);
+        try {
+          const createRes = await api.post("/academic-periods", {
+            academic_year: activeSem.schoolYear,
+            semester:      expectedSem,
+            is_current:    false,
+          });
+          matchingPeriod = createRes.data;
+        } catch (createErr: any) {
+          console.warn("[DEBUG] Period may already exist, re-fetching...");
+          const retryRes = await api.get("/academic-periods");
+          const retryList = Array.isArray(retryRes.data) ? retryRes.data : retryRes.data?.data ?? [];
+          matchingPeriod = retryList.find((p: any) =>
+            p.academicYear === activeSem.schoolYear && p.semester === expectedSem
+          );
+          if (!matchingPeriod) {
+            console.error("Failed to create academic period:", createErr);
+            alert(`Failed to create academic period for ${activeSem.schoolYear} ${expectedSem}.`);
+            setGenerating(false);
+            return;
+          }
+        }
+      }
+
+      const periodId = matchingPeriod.period_id ?? matchingPeriod.id;
+      console.log(`[DEBUG] Using period_id: ${periodId}`);
+
+      // 2. Generate schedule  ← THIS WAS MISSING
+      const result = await generateSchedule({ sem: activeSem.sem });
+
+      // 3. Filter out invalid entries
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const validEntries = result.schedule.filter((entry: any) => {
+        const isValid =
+          entry.faculty_id && uuidRegex.test(entry.faculty_id) &&
+          entry.subject_id && entry.subject_id !== "TBD" &&
+          entry.room_id    && entry.room_id    !== "TBD" &&
+          entry.day        && entry.day        !== "TBD";
+        if (!isValid) console.warn("[DEBUG] Skipping invalid entry:", entry);
+        return isValid;
       });
-    });
 
-    await Promise.all(savePromises);
+      console.log(`[DEBUG] ${result.schedule.length} total, ${validEntries.length} valid entries to save`);
 
-    // 3. Refresh the local state from the database to get the real IDs
-    const refreshRes = await fetch(`${API_BASE}/schedules`, { headers });
-    const freshData = await refreshRes.json();
-    setSchedules(Array.isArray(freshData) ? freshData : freshData.data || []);
+      // 4. Save to database (periodId already obtained at line 1698)
+          const savePromises = validEntries.map((entry: any, idx: number) => {
+        const payload = {
+          id:               `gen-${Date.now()}-${idx}`,
+          faculty_id:       entry.faculty_id,
+          subject_id:       entry.subject_id,
+          room_id:          entry.room_id,
+          day:              entry.day,
+          start_time:       entry.start_time,
+          end_time:         entry.end_time,
+          section:          entry.section,
+          status:           "draft" as const,
+          session_group_id: entry.session_group_id ?? null,
+          session_hours:    entry.session_hours ?? null,
+        };
+        console.log("[DEBUG] Saving:", JSON.stringify(payload));
+        return api.post("/schedules", payload);
+      });
 
-    setScanned(false);
-    setLastReasoning({
-      perProgram:     result.perProgramReasoning,
-      utilization:    result.facultyUtilization,
-      missingEntries: result.missingEntries,
-      wasFixed:       result.wasFixed,
-      apiCalls:       result.apiCallsUsed,
-      sem:            activeSem.sem,
-      schoolYear:     activeSem.schoolYear,
-    });
-    
-    setModal("reasoning");
-  } catch (err) {
-    console.error("Persistence failed:", err);
-    alert("Schedule generated but failed to save to database.");
-  } finally {
-    setGenerating(false);
-  }
-};
+      await Promise.all(savePromises);
+      // 5. Refresh local state
+      const refreshRes = await api.get("/schedules");
+      const freshData = refreshRes.data;
+      setSchedules(Array.isArray(freshData) ? freshData : freshData.data || []);
+
+      setScanned(false);
+      setLastReasoning({
+        perProgram:     result.perProgramReasoning,
+        utilization:    result.facultyUtilization,
+        missingEntries: result.missingEntries,
+        wasFixed:       result.wasFixed,
+        apiCalls:       result.apiCallsUsed,
+        sem:            activeSem.sem,
+        schoolYear:     activeSem.schoolYear,
+      });
+
+      setModal("reasoning");
+    } catch (err) {
+      console.error("Persistence failed:", err);
+      alert("Schedule generation failed. Check console for details.");
+    } finally {
+      setGenerating(false);
+    }
+  };
   // ✏️ EDIT — replace the setTimeout with your actual Supabase + Gemini API call
 
 // REPLACE WITH:
