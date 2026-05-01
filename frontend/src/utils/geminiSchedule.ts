@@ -1,3 +1,21 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// geminiSchedule.ts
+//
+// Gemini-powered conflict enrichment for DeptFlow scheduling.
+//
+// ALIGNMENT NOTE — this file shares the same rule-set as geminiSchedHelper.ts.
+// Any rule added there must be mirrored here so that Gemini never flags a
+// "conflict" that the scheduler intentionally produced under an exception rule.
+//
+// EXCEPTIONS (must NOT be treated as conflicts):
+//   ✓ Lab subjects → 1 credit unit but 2 clock hours of teaching time
+//   ✓ NSTP subjects → always scheduled on Sunday (not Mon-Sat)
+//   ✓ Lab-Lec pairs → Lab and its matching Lecture for the same section
+//       MUST share the same faculty — this is the correct state, not a conflict
+//   ✓ Lab sessions → MAY be split across two separate time blocks / days
+//   ✓ Sunday → valid teaching day (for NSTP only)
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface GeminiConflictSuggestion {
   conflictId: string;
   suggestion: string;
@@ -17,6 +35,7 @@ export interface GeminiScheduleContext {
     code: string;
     name: string;
     units: number;
+    facilityType?: string; // "lab" | "lecture" — needed for lab-hour exception
   }[];
   schedules: {
     id: string;
@@ -45,7 +64,28 @@ export async function enrichConflictsWithGemini(
   context: GeminiScheduleContext
 ): Promise<GeminiConflictSuggestion[]> {
 
-  const prompt = buildPrompt(context);
+  // Pre-filter: remove conflict types that Gemini should never touch because
+  // they are either auto-fixed by the local engine or are valid by exception.
+  // Passing them to Gemini risks getting back incorrect "suggestions".
+  const filteredConflicts = context.detectedConflicts.filter(c => {
+    // labhr-* conflicts are handled by a one-click local fix — no Gemini needed
+    if (c.id.startsWith("labhr-")) return false;
+    // nstp-day-* conflicts have a deterministic fix (→ Sunday) — skip Gemini
+    if (c.id.startsWith("nstp-day-")) return false;
+    // lablec-* conflicts have a deterministic fix (assign same faculty) — skip
+    if (c.id.startsWith("lablec-")) return false;
+    return true;
+  });
+
+  // Nothing left to enrich after filtering
+  if (filteredConflicts.length === 0) return [];
+
+  const enrichContext: GeminiScheduleContext = {
+    ...context,
+    detectedConflicts: filteredConflicts,
+  };
+
+  const prompt = buildPrompt(enrichContext);
 
   const response = await fetch(GEMINI_API_URL, {
     method: "POST",
@@ -110,29 +150,76 @@ function buildPrompt(ctx: GeminiScheduleContext): string {
     .join(", ");
 
   const scheduleList = relevantSchedules
-    .map(s => `[${s.id}]${s.subjectCode}|${s.facultyName}|${s.section}|${s.room}|${s.day} ${s.startTime}-${s.endTime}`)
+    .map(s => {
+      // Tag lab subjects so Gemini knows their 2-hour clock rule
+      const sub = ctx.subjects.find(x => x.code === s.subjectCode);
+      const labTag = sub?.facilityType === "lab" ? "[LAB-2HRS]" : "";
+      return `[${s.id}]${s.subjectCode}${labTag}|${s.facultyName}|${s.section}|${s.room}|${s.day} ${s.startTime}-${s.endTime}`;
+    })
     .join("\n");
 
   const conflictList = ctx.detectedConflicts
     .map(c => `conflictId:"${c.id}"|${c.type}|"${c.label}": ${c.message}`)
     .join("\n");
 
+  // Build a summary of subjects in the context so Gemini has facility type info
+  const subjectLegend = ctx.subjects
+    .filter(s => relevantSchedules.some(r => r.subjectCode === s.code))
+    .map(s => `${s.code}(${s.units}u,${s.facilityType ?? "lecture"})`)
+    .join(", ");
+
   return `
-You are a schedule conflict advisor for TUP (Philippines).
-Provide one fix suggestion per conflict. Be specific — name faculty, subject codes, times.
+You are a schedule conflict advisor for TUP (Technological University of the Philippines).
+Provide one actionable fix suggestion per conflict. Be specific — name faculty, subject codes, and times.
 
 INVOLVED FACULTY: ${facultyList}
 
-INVOLVED SCHEDULE ENTRIES:
+SUBJECT INFO (code|units|facilityType): ${subjectLegend}
+
+INVOLVED SCHEDULE ENTRIES ([id]subjectCode[LAB-2HRS?]|faculty|section|room|day startTime-endTime):
 ${scheduleList}
 
-CONFLICTS:
+CONFLICTS TO RESOLVE:
 ${conflictList}
 
-RULES: Full-time max 21u, part-time max 12u. Lab subjects need lab rooms. Only assign faculty their specializations. Respect unavailable days/slots.
+─── CRITICAL EXCEPTION RULES ───────────────────────────────────────────────────
+You MUST apply these rules when forming suggestions. Violating them produces bad advice.
 
-Return ONLY a JSON array — no markdown:
-[{"conflictId":"<exact id>","suggestion":"<2 sentences max>","summaryNote":"<1 sentence>"}]
+1. LOAD LIMITS: Full-time faculty max = 21 units. Part-time max = 12 units.
+
+2. FACILITY MATCH: Lab subjects must be in lab rooms. Lecture subjects in lecture rooms.
+   Only assign faculty to subjects within their specialization.
+
+3. LAB HOUR EXCEPTION (DO NOT flag as conflict):
+   Lab subjects are 1 credit unit but require EXACTLY 2 clock hours of teaching.
+   A lab entry showing 1 unit scheduled for 2 hours is CORRECT — do not suggest
+   reducing it to 1 hour. If you see a lab entry with only 1 clock hour, suggest
+   extending it to 2 hours.
+
+4. NSTP SUNDAY RULE (DO NOT flag as conflict):
+   NSTP subjects are ALWAYS scheduled on Sunday. A Sunday schedule for NSTP is
+   intentional and correct — never suggest moving NSTP to a weekday.
+   Sunday is a valid teaching day for NSTP only.
+
+5. LAB-LEC PAIRING (DO NOT flag as conflict):
+   If a section has both a Lab variant and a Lecture variant of the same subject
+   (e.g. "Web Dev Lab" + "Web Dev Lec" for the same section), they MUST be taught
+   by the SAME faculty member to combine into full credit units (e.g. 3 units total).
+   Having the same professor teach both the Lab and Lec is the CORRECT and REQUIRED
+   state — never suggest splitting them to different faculty.
+
+6. LAB SPLIT SESSIONS (DO NOT flag as conflict):
+   A lab subject may be split into two separate time blocks on different days
+   (e.g. 1 hr Monday + 1 hr Wednesday = 2 clock hours total). This is valid.
+   Do not flag split lab sessions as a time conflict if they are on different days.
+
+7. THREE-STAGE WORKFLOW: Schedules pass through Draft → Finalized → Published.
+   Only Draft and Finalized entries need conflict resolution. Published entries
+   are locked and should not be suggested for changes.
+─────────────────────────────────────────────────────────────────────────────────
+
+Return ONLY a valid JSON array — no markdown, no extra text:
+[{"conflictId":"<exact id from CONFLICTS list>","suggestion":"<specific fix, 2 sentences max>","summaryNote":"<1 sentence summary>"}]
 `.trim();
 }
 

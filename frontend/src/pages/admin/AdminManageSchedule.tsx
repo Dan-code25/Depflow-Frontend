@@ -11,6 +11,7 @@
 // EDITABLE SECTIONS are marked with: // ✏️ EDIT
 // ─────────────────────────────────────────────────────────────────────────────
 import { AdminLayout } from "../../components/layout/AdminLayout";
+import api from "../../services/api";
 
 import { useState, useMemo, useEffect } from "react";
 import {
@@ -22,7 +23,7 @@ import { enrichConflictsWithGemini, type GeminiScheduleContext } from "../../uti
 import { generateSchedule, type FacultyUtilization, type MissingEntry, type ScheduleAssignment } from "../../utils/geminiSchedHelper";
 
 
-type ScheduleStatus = "draft" | "finalized";
+type ScheduleStatus = "draft" | "finalized" | "published";
 type ConflictType   = "HARD" | "SOFT";
 type ViewMode = "card" | "timetable";
 
@@ -70,7 +71,7 @@ let ROOM_LIST: any[] = [];
 
 
 // ✏️ EDIT — Days of the week for schedule entries
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const HOURS_PER_UNIT = 1;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,8 +113,11 @@ const getDurationHours = (start: string, end: string): number => {
   return (toMins(end) - toMins(start)) / 60;
 };
 
-const isHourUnitMatch = (start: string, end: string, units: number): boolean =>
-  getDurationHours(start, end) === units * HOURS_PER_UNIT;
+const isHourUnitMatch = (start: string, end: string, units: number, facilityType?: string): boolean => {
+  // Lab exception: 1 unit lab = 2 clock hours
+  const expectedHours = (facilityType === "lab") ? units * 2 : units * HOURS_PER_UNIT;
+  return getDurationHours(start, end) === expectedHours;
+};
 
 function buildGeminiContext(
   sched: ScheduleAssignment[],
@@ -133,6 +137,7 @@ function buildGeminiContext(
       code: s.code,
       name: s.name,
       units: s.units,
+      facilityType: (s as any).facilityType ?? "lecture",
     })),
  
     schedules: sched.map((s) => {
@@ -241,17 +246,21 @@ function runConflictScan(sched: ScheduleAssignment[]): Conflict[] {
 
   // ── Pass 2: per-entry hour mismatch ───────────────────────────────────────
   sched.forEach(s => {
-    const sub = getSubject(s.subject_id);
+    const sub = getSubject(s.subject_id) as any;
     if (!sub) return;
-    if (!isHourUnitMatch(s.start_time, s.end_time, sub.units)) {
+    if (!isHourUnitMatch(s.start_time, s.end_time, sub.units, sub.facilityType)) {
       const actual   = getDurationHours(s.start_time, s.end_time);
-      const expected = sub.units * HOURS_PER_UNIT;
+      const isLab    = sub.facilityType === "lab";
+      const expected = isLab ? sub.units * 2 : sub.units * HOURS_PER_UNIT;
+      const unitRule = isLab
+        ? `Lab exception: 1 unit = 2 clock hours`
+        : `1 unit = ${HOURS_PER_UNIT} hr`;
       results.push({
         id: `unithr-${s.id}`,
         type: "SOFT",
         label: "Hour–Unit Mismatch",
         affected: [s.id],
-        message: `${sub.code} (${sub.units} units) for section ${s.section} is scheduled for ${actual} hr${actual !== 1 ? "s" : ""} but should be ${expected} hr${expected !== 1 ? "s" : ""} (1 unit = ${HOURS_PER_UNIT} hr).`,
+        message: `${sub.code} (${sub.units} unit${sub.units !== 1 ? "s" : ""}) for section ${s.section} is scheduled for ${actual} hr${actual !== 1 ? "s" : ""} but should be ${expected} hr${expected !== 1 ? "s" : ""} (${unitRule}).`,
         suggestion: `Adjust the time slot so the class runs for exactly ${expected} hour${expected !== 1 ? "s" : ""}. Example: if start is ${s.start_time}, set end to ${(() => { const end = toMins(s.start_time) + expected * 60; return `${String(Math.floor(end/60)).padStart(2,"0")}:${String(end%60).padStart(2,"0")}`; })()}.`,
         fix: {
           scheduleId: s.id,
@@ -397,8 +406,106 @@ function runConflictScan(sched: ScheduleAssignment[]): Conflict[] {
     }
   }
 
-  // ── Pass 5: preferred-time soft warnings ─────────────────────────────────
-  // Check every confirmed assignment against the faculty's preferred time range.
+  // ── Pass 4b: Lab–Lec faculty mismatch ────────────────────────────────────
+  // If a section has both a Lab and a Lecture variant of the same subject,
+  // they MUST be assigned to the same faculty member to count as full 3 units.
+  const bySection: Record<string, ScheduleAssignment[]> = {};
+  sched.forEach(s => {
+    if (!bySection[s.section]) bySection[s.section] = [];
+    bySection[s.section].push(s);
+  });
+
+  Object.entries(bySection).forEach(([section, entries]) => {
+    const labs     = entries.filter(s => (getSubject(s.subject_id) as any)?.facilityType === "lab");
+    const lectures = entries.filter(s => (getSubject(s.subject_id) as any)?.facilityType === "lecture");
+
+    labs.forEach(lab => {
+      const labSub = getSubject(lab.subject_id);
+      if (!labSub) return;
+      const labBase = labSub.code
+        .replace(/\s*(lab|laboratory)\s*$/i, "")
+        .replace(/\s*(lec|lecture)\s*$/i, "")
+        .trim().toUpperCase();
+
+      lectures.forEach(lec => {
+        const lecSub = getSubject(lec.subject_id);
+        if (!lecSub) return;
+        const lecBase = lecSub.code
+          .replace(/\s*(lab|laboratory)\s*$/i, "")
+          .replace(/\s*(lec|lecture)\s*$/i, "")
+          .trim().toUpperCase();
+
+        if (labBase !== lecBase) return;
+        if (lab.faculty_id === lec.faculty_id) return;
+        if (lab.faculty_id === "TBD" || lec.faculty_id === "TBD") return;
+
+        const pairKey = [lab.id, lec.id].sort().join("-");
+        if (seen.has(pairKey)) return;
+        seen.add(pairKey);
+
+        const labFacName = getFacultyName(getFaculty(lab.faculty_id));
+        const lecFacName = getFacultyName(getFaculty(lec.faculty_id));
+        results.push({
+          id:        `lablec-${pairKey}`,
+          type:      "HARD",
+          label:     "Lab–Lec Faculty Mismatch",
+          affected:  [lab.id, lec.id],
+          message:   `${labSub.code} (Lab) and ${lecSub.code} (Lec) for ${section} are assigned to different faculty: ` +
+                     `${labFacName} (Lab) vs ${lecFacName} (Lec). Both must go to the same professor for the full 3-unit credit.`,
+          suggestion: `Reassign the Lecture section to ${labFacName} (who has the Lab) or vice versa, ` +
+                      `whichever faculty has more remaining unit capacity.`,
+          fix:       { scheduleId: lec.id, field: "faculty_id", value: lab.faculty_id },
+          transfers: [],
+          dismissed: false,
+          applied:   false,
+        });
+      });
+    });
+  });
+
+  // ── Pass 4c: NSTP must be on Sunday ──────────────────────────────────────
+  sched.forEach(s => {
+    const sub = getSubject(s.subject_id);
+    if (!sub || !sub.code.toUpperCase().includes("NSTP")) return;
+    if (s.day === "Sunday" || s.day === "TBD") return;
+    results.push({
+      id:        `nstp-day-${s.id}`,
+      type:      "HARD",
+      label:     "NSTP Must Be Sunday",
+      affected:  [s.id],
+      message:   `${sub.code} (${s.section}) is scheduled on ${s.day}. NSTP must always be scheduled on Sunday per curriculum policy.`,
+      suggestion: `Move this entry to Sunday at the same time slot.`,
+      fix:       { scheduleId: s.id, field: "day", value: "Sunday" },
+      transfers: [],
+      dismissed: false,
+      applied:   false,
+    });
+  });
+
+  // ── Pass 4d: Lab subjects need 2 clock hours (exception to 1u = 1hr rule) ─
+  sched.forEach(s => {
+    if (s.day === "TBD" || !s.start_time || !s.end_time || s.start_time === "TBD") return;
+    const sub = getSubject(s.subject_id) as any;
+    if (!sub || sub.facilityType !== "lab") return;
+    const clockHours = getDurationHours(s.start_time, s.end_time);
+    if (clockHours >= 2) return; // already correct
+    const endMins = toMins(s.start_time) + 120;
+    const fixedEnd = `${String(Math.floor(endMins / 60)).padStart(2,"0")}:${String(endMins % 60).padStart(2,"0")}`;
+    results.push({
+      id:        `labhr-${s.id}`,
+      type:      "HARD",
+      label:     "Lab Requires 2 Clock Hours",
+      affected:  [s.id],
+      message:   `${sub.code} (${s.section}) is a lab subject (1 unit = 2 clock hrs) but is only scheduled for ${clockHours} hr${clockHours !== 1 ? "s" : ""}. Labs always need 2 hours of actual teaching time even though they're 1 credit unit.`,
+      suggestion: `Extend the end time from ${s.end_time} to ${fixedEnd} (2 hours from start). Alternatively, split into two 1-hour sessions on different days.`,
+      fix:       { scheduleId: s.id, field: "end_time", value: fixedEnd },
+      transfers: [],
+      dismissed: false,
+      applied:   false,
+    });
+  });
+
+  // ── Pass 5: preferred-time soft warnings ─────────────────────────────────  // Check every confirmed assignment against the faculty's preferred time range.
   // These are pushed FIRST among soft warnings (before uneven load, near-limit,
   // TBD notices) so they appear at the top of the soft section in the scan modal.
   const preferredTimeWarnings: Conflict[] = [];
@@ -458,9 +565,11 @@ function Avatar({ initials, colorClass, size = "md" }: { initials:string; colorC
 
 // Status badge pill
 function StatusBadge({ status }: { status: ScheduleStatus }) {
-  return status === "finalized"
-    ? <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700"><span className="w-1.5 h-1.5 rounded-full bg-green-600 inline-block"/>Finalized</span>
-    : <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"/>Draft</span>;
+  if (status === "published")
+    return <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700"><span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block"/>Published</span>;
+  if (status === "finalized")
+    return <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700"><span className="w-1.5 h-1.5 rounded-full bg-green-600 inline-block"/>Finalized</span>;
+  return <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700"><span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"/>Draft</span>;
 }
 
 // Conflict type badge
@@ -758,9 +867,11 @@ function ScheduleFormModal({ editing, onSave, onClose }: {
   const [form, setForm] = useState<Omit<ScheduleAssignment,"id">>(editing ? { ...editing } : { ...EMPTY_FORM });
   const set = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }));
   const isValid = !!(form.faculty_id && form.subject_id && form.room_id && form.day && form.start_time && form.end_time && form.section);
-  const selectedSubject = getSubject(form.subject_id);
+  const selectedSubject = getSubject(form.subject_id) as any;
+  const isLabSubject    = selectedSubject?.facilityType === "lab";
+  const expectedHours   = isLabSubject ? (selectedSubject?.units ?? 1) * 2 : (selectedSubject?.units ?? 0) * HOURS_PER_UNIT;
   const durationHours   = getDurationHours(form.start_time, form.end_time);
-  const hoursMismatch   = !!(form.start_time && form.end_time && selectedSubject && !isHourUnitMatch(form.start_time, form.end_time, selectedSubject.units));
+  const hoursMismatch   = !!(form.start_time && form.end_time && selectedSubject && !isHourUnitMatch(form.start_time, form.end_time, selectedSubject.units, selectedSubject.facilityType));
 
   return (
     <Modal title={editing ? "Edit Assignment" : "Add Assignment"} onClose={onClose}>
@@ -830,19 +941,33 @@ function ScheduleFormModal({ editing, onSave, onClose }: {
         </div>
       </div>
 
-      {/* Info note */}
       {/* Hour / unit mismatch warning */}
       {hoursMismatch && selectedSubject && (
         <div className="mt-4 flex gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
           <AlertTriangle size={14} className="shrink-0 mt-0.5"/>
           <span>
-            <strong>{selectedSubject.code}</strong> is {selectedSubject.units} unit{selectedSubject.units !== 1 ? "s" : ""} — requires exactly <strong>{selectedSubject.units * HOURS_PER_UNIT} hr{selectedSubject.units !== 1 ? "s" : ""}</strong> of class time (1 unit = {HOURS_PER_UNIT} hr). Current slot is <strong>{durationHours} hr{durationHours !== 1 ? "s" : ""}</strong>.
+            <strong>{selectedSubject.code}</strong> is {selectedSubject.units} unit{selectedSubject.units !== 1 ? "s" : ""} —
+            {isLabSubject
+              ? <> requires exactly <strong>{expectedHours} hrs</strong> of class time (Lab exception: 1 unit = 2 clock hours). Current slot is <strong>{durationHours} hr{durationHours !== 1 ? "s" : ""}</strong>.</>
+              : <> requires exactly <strong>{expectedHours} hr{expectedHours !== 1 ? "s" : ""}</strong> of class time (1 unit = {HOURS_PER_UNIT} hr). Current slot is <strong>{durationHours} hr{durationHours !== 1 ? "s" : ""}</strong>.</>
+            }
+          </span>
+        </div>
+      )}
+
+      {/* Lab subject info note */}
+      {isLabSubject && !hoursMismatch && form.start_time && form.end_time && selectedSubject && (
+        <div className="mt-4 flex gap-2 p-3 bg-violet-50 border border-violet-200 rounded-lg text-xs text-violet-700">
+          <Info size={14} className="shrink-0 mt-0.5"/>
+          <span>
+            <strong>Lab subject</strong> — {selectedSubject.units} unit = {expectedHours} clock hours. Time slot is correct ✓.
+            Lab sessions may be split across two days if needed (use the same session_group_id).
           </span>
         </div>
       )}
 
       {/* Hour / unit match confirmation */}
-      {!hoursMismatch && form.start_time && form.end_time && selectedSubject && (
+      {!hoursMismatch && !isLabSubject && form.start_time && form.end_time && selectedSubject && (
         <div className="mt-4 flex gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
           <CheckCircle2 size={14} className="shrink-0 mt-0.5"/>
           <span>
@@ -1407,6 +1532,7 @@ export default function ManageSchedule() {
   const [filterFac,      setFilterFac]      = useState("All");
   const [filterProgram,  setFilterProgram]  = useState("All");
   const [filterRoom,     setFilterRoom]     = useState("All");
+  const [filterStatus,   setFilterStatus]   = useState("All");
   const [modal,          setModal]          = useState<"add"|"edit"|"delete"|"scan"|"reasoning"|null>(null);
   const [selected,       setSelected]       = useState<ScheduleAssignment|null>(null);
   const [conflicts,      setConflicts]      = useState<Conflict[]>([]);
@@ -1429,75 +1555,83 @@ export default function ManageSchedule() {
     sem: 1,
   });
 
-
-const API_BASE = "http://localhost:3000/api/manage-schedule";
 useEffect(() => {
   const loadData = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const headers = {
-        "Content-Type": "application/json",
-        ...(token ? { "Authorization": `Bearer ${token}` } : {})
-      };
-
+      // 1. Use the working 'api' service instead of raw fetch
       const [facRes, subRes, roomRes, schedRes] = await Promise.all([
-        fetch(`${API_BASE}/faculty`, { headers }),
-        fetch(`${API_BASE}/subjects`, { headers }),
-        fetch(`${API_BASE}/rooms`, { headers }),
-        fetch(`${API_BASE}/schedules`, { headers })
+        api.get("/manage-schedule/faculty"),
+        api.get("/manage-schedule/subjects"),
+        api.get("/manage-schedule/rooms"),
+        api.get("/manage-schedule/schedules")
       ]);
 
-      const toArray = (d: any) =>
-        Array.isArray(d) ? d : d?.data ?? d?.items ?? d?.result ?? [];
+      // 2. Safe unwrapper (handles different backend response structures)
+      const unwrapArray = (response: any): any[] => {
+        if (Array.isArray(response)) return response;
+        if (response?.data && Array.isArray(response.data)) return response.data;
+        return [];
+      };
 
-      const facData   = toArray(await facRes.json());
-      const subData   = toArray(await subRes.json());
-      const roomData  = toArray(await roomRes.json());
-      const schedData = toArray(await schedRes.json());
+      const facData   = unwrapArray(facRes.data ?? facRes);
+      const subData   = unwrapArray(subRes.data ?? subRes);
+      const roomData  = unwrapArray(roomRes.data ?? roomRes);
+      const schedData = unwrapArray(schedRes.data ?? schedRes);
 
-      FACULTY_LIST = facData.map((f: any) => ({
-        id: f.id,
-        personal: f.personal ?? {
-          firstName:      f.first_name      || f.firstName,
-          lastName:       f.last_name       || f.lastName,
-          employmentType: f.employment_type || f.employmentType,
-          status:         f.status          ?? "Active",
-        },
-        preferences: f.preferences ?? {}
-      }));
+      // 3. Robust mapping (identical to your working geminiSchedHelper.ts)
+      FACULTY_LIST = facData.map((f: any) => {
+        const personal = f.personal
+          ? (typeof f.personal === 'string' ? JSON.parse(f.personal) : f.personal)
+          : null;
+        const prefs = f.preferences 
+          ? (typeof f.preferences === 'string' ? JSON.parse(f.preferences) : f.preferences) 
+          : {};
+          
+        return {
+          id: f.id || f.faculty_id,
+          personal: {
+            firstName:      personal?.firstName      ?? f.first_name,
+            lastName:       personal?.lastName       ?? f.last_name,
+            employmentType: personal?.employmentType ?? f.employment_type ?? "Full-time",
+            status:         personal?.status         ?? f.status          ?? "Active",
+          },
+          preferences: prefs
+        };
+      });
 
       SUBJECT_LIST = subData.map((s: any) => ({
-        id:             s.subject_code,
-        code:           s.subject_code,
-        name:           s.subject_name,
-        units:          s.units,
-        facilityType:   s.facility_type   ?? "lecture",
-        assignmentMode: s.assignment_mode ?? "auto",
-        canSplit:       s.can_split       ?? false,
-        splitPattern:   s.split_pattern   ?? null,
+        id:             (s.subject_code ?? s.code ?? "").trim(),
+        code:           (s.subject_code ?? s.code ?? "").trim(),
+        name:           s.subject_name  ?? s.name,
+        units:          s.units ?? 0,
+        facilityType:   s.facility_type ?? s.facilityType   ?? "lecture",
+        assignmentMode: s.assignment_mode ?? s.assignmentMode ?? "auto",
+        canSplit:       s.can_split     ?? s.canSplit        ?? false,
+        splitPattern:   s.split_pattern ?? s.splitPattern   ?? null,
       }));
 
       ROOM_LIST = roomData.map((r: any) => ({
         id:       r.id,
         room:     r.room,
-        type:     r.type     ?? "lecture",
+        type:     r.type ?? "lecture",
         capacity: r.capacity ?? 40,
       }));
 
       setSchedules(schedData.map((s: any) => ({
         id:               s.id,
-        faculty_id:       s.faculty_id,
+        faculty_id:       s.faculty_id || "TBD", // Converts null to TBD
         subject_id:       s.subject_id,
-        room_id:          s.room_id,
-        day:              s.day,
-        start_time:       s.start_time,
-        end_time:         s.end_time,
+        room_id:          s.room_id || "TBD",
+        day:              s.day || "TBD",
+        start_time:       s.start_time || "TBD",
+        end_time:         s.end_time || "TBD",
         section:          s.section,
-        status:           s.status          ?? "draft",
+        status:           s.status ?? "draft",
         session_group_id: s.session_group_id,
         session_hours:    s.session_hours,
       })));
 
+      // 4. Trigger re-render now that lists are populated!
       setIsDataLoaded(true);
     } catch (error) {
       console.error("Failed to load database records:", error);
@@ -1510,20 +1644,39 @@ useEffect(() => {
   // ── Derived values ─────────────────────────────────────────────────────────
   const drafts    = schedules.filter(s=>s.status==="draft").length;
   const finalized = schedules.filter(s=>s.status==="finalized").length;
+  const published = schedules.filter(s=>s.status==="published").length;
 
   const filtered = useMemo(()=>schedules.filter(s=>{
-    const f=getFaculty(s.faculty_id), sub=getSubject(s.subject_id), q=search.toLowerCase();
-    const sectionProgram = s.section.trim().split(" ")[0].toUpperCase();
-    const programMatch = filterProgram === "All" || sectionProgram === filterProgram;
-    const roomMatch    = filterRoom    === "All" || String(s.room_id) === filterRoom;
+    const f=getFaculty(s.faculty_id);
+    const sub=getSubject(s.subject_id);
+    const q=search.toLowerCase();
+
+    // 1. Safe extraction of the program from the section string
+    const safeSection = s.section ? String(s.section).trim() : "";
+    const sectionProgram = safeSection.split(" ")[0]?.toUpperCase() || "";
+    
+    // 2. Resilient Program Match
+    const programMatch = filterProgram === "All" || sectionProgram === filterProgram.toUpperCase();
+    
+    // 3. Resilient Room Match (Strict string comparison)
+    const roomMatch = filterRoom === "All" || String(s.room_id) === String(filterRoom);
+
+    // 4. Safe search logic (prevent crashes if 'sub' or 'f' are undefined)
+    const matchesSearch = !search || 
+      (f && getFacultyName(f).toLowerCase().includes(q)) || 
+      (sub && sub.name.toLowerCase().includes(q)) || 
+      (sub && sub.code.toLowerCase().includes(q)) || 
+      safeSection.toLowerCase().includes(q);
+
     return (
-      (!search || getFacultyName(f).toLowerCase().includes(q) || sub?.name.toLowerCase().includes(q) || sub?.code.toLowerCase().includes(q) || s.section.toLowerCase().includes(q)) &&
-      (filterDay==="All" || s.day===filterDay) &&
-      (filterFac==="All" || s.faculty_id===filterFac) &&
+      matchesSearch &&
+      (filterDay === "All" || s.day === filterDay) &&
+      (filterFac === "All" || String(s.faculty_id) === String(filterFac)) &&
       programMatch &&
-      roomMatch
+      roomMatch &&
+      (filterStatus === "All" || s.status === filterStatus)
     );
-  }), [schedules, search, filterDay, filterFac, filterProgram, filterRoom, isDataLoaded]);
+  }), [schedules, search, filterDay, filterFac, filterProgram, filterRoom, filterStatus, isDataLoaded]);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const openEdit   = (s:ScheduleAssignment) => { setSelected(s); setModal("edit");   };
@@ -1532,19 +1685,14 @@ useEffect(() => {
 
 const handleSave = async (entry: ScheduleAssignment) => {
   try {
-    const token = localStorage.getItem("token");
-    const headers = {
-      "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    };
-
     const payload = {
-      faculty_id:       entry.faculty_id,
+      // 🔴 CRITICAL FIX: Convert TBD to null so the DB doesn't crash!
+      faculty_id:       entry.faculty_id === "TBD" ? null : entry.faculty_id,
       subject_id:       entry.subject_id,
-      room_id:          entry.room_id,
-      day:              entry.day,
-      start_time:       entry.start_time,
-      end_time:         entry.end_time,
+      room_id:          entry.room_id === "TBD" ? null : entry.room_id,
+      day:              entry.day === "TBD" ? null : entry.day,
+      start_time:       entry.start_time === "TBD" ? null : entry.start_time,
+      end_time:         entry.end_time === "TBD" ? null : entry.end_time,
       section:          entry.section,
       status:           entry.status ?? "draft",
       session_group_id: entry.session_group_id,
@@ -1552,15 +1700,11 @@ const handleSave = async (entry: ScheduleAssignment) => {
     };
 
     if (modal === "edit") {
-      await fetch(`${API_BASE}/schedules/${entry.id}`, {
-        method: "PATCH", headers, body: JSON.stringify(payload)
-      });
+      await api.patch(`/manage-schedule/schedules/${entry.id}`, payload);
       setSchedules(p => p.map(s => s.id === entry.id ? entry : s));
     } else {
-      const res = await fetch(`${API_BASE}/schedules`, {
-        method: "POST", headers, body: JSON.stringify(payload)
-      });
-      const savedData = await res.json();
+      const res = await api.post("/manage-schedule/schedules", payload);
+      const savedData = res.data;
       setSchedules(p => [...p, { ...entry, id: savedData.id }]);
     }
 
@@ -1572,22 +1716,19 @@ const handleSave = async (entry: ScheduleAssignment) => {
   }
 };
 
-const handleDelete = async () => {
-  if (!selected) return;
-  try {
-    const token = localStorage.getItem("token");
-    await fetch(`${API_BASE}/schedules/${selected.id}`, {
-      method: "DELETE",
-      headers: { ...(token ? { "Authorization": `Bearer ${token}` } : {}) }
-    });
-    setSchedules(p => p.filter(s => s.id !== selected.id));
-    setScanned(false);
-    closeModal();
-  } catch (error) {
-    console.error("Delete failed:", error);
-    alert("Failed to delete schedule from database.");
-  }
-};
+  const handleDelete = async () => {
+    if (!selected) return;
+    try {
+      // Standardized to use api.delete
+      await api.delete(`/manage-schedule/schedules/${selected.id}`);
+      setSchedules(p => p.filter(s => s.id !== selected.id));
+      setScanned(false);
+      closeModal();
+    } catch (error) {
+      console.error("Delete failed:", error);
+      alert("Failed to delete schedule from database.");
+    }
+  };
 
   const handleApplyFix = (fix: Conflict["fix"]) => {
     if (!fix) return;
@@ -1613,10 +1754,48 @@ const handleDelete = async () => {
     setScanned(false);
   };
 
-  const handleFinalize = () => {
-    setSchedules(p=>p.map(s=>({ ...s, status:"finalized" as ScheduleStatus })));
+  const handleFinalize = async () => {
+    const toFinalize = schedules.filter(s => s.status === "draft");
+    if (toFinalize.length === 0) { closeModal(); return; }
+
+    setSchedules(p => p.map(s => s.status === "draft" ? { ...s, status: "finalized" as ScheduleStatus } : s));
+
+    try {
+      await Promise.all(
+        toFinalize.map(entry =>
+          api.patch(`/manage-schedule/schedules/${entry.id}`, { status: "finalized" })
+        )
+      );
+    } catch (err) {
+      console.error("[DeptFlow] Failed to persist finalize:", err);
+    }
     setScanned(false);
     closeModal();
+  };
+
+  const handlePublish = async () => {
+    const toPublish = schedules.filter(s => s.status === "finalized");
+    if (toPublish.length === 0) {
+      alert("No finalized schedules to publish. Please run the conflict scan and finalize first.");
+      return;
+    }
+
+    const ok = window.confirm(`Publish ${toPublish.length} finalized schedule entry(ies)?`);
+    if (!ok) return;
+
+    setSchedules(p => p.map(s => s.status === "finalized" ? { ...s, status: "published" as ScheduleStatus } : s));
+
+    try {
+      await Promise.all(
+        toPublish.map(entry =>
+          api.patch(`/manage-schedule/schedules/${entry.id}`, { status: "published" })
+        )
+      );
+    } catch (err) {
+      console.error("[DeptFlow] Failed to persist publish:", err);
+      setSchedules(p => p.map(s => s.status === "published" && toPublish.find(x => x.id === s.id) ? { ...s, status: "finalized" as ScheduleStatus } : s));
+      alert("Failed to publish schedules to database. Please try again.");
+    }
   };
 
 
@@ -1624,65 +1803,60 @@ const handleDelete = async () => {
   const [generating, setGenerating] = useState(false);
 
   const handleGenerate = async () => {
-  setGenerating(true);
-  try {
-    const result = await generateSchedule({ sem: activeSem.sem });
-    
-    // 1. Get your auth token
-    const token = localStorage.getItem("token");
-    const headers = {
-      "Content-Type": "application/json",
-      ...(token ? { "Authorization": `Bearer ${token}` } : {})
-    };
+    setGenerating(true);
+    try {
+      const result = await generateSchedule({ sem: activeSem.sem });
+      
+      // 1. UPDATE THE UI DIRECTLY WITH GEMINI'S JSON OUTPUT!
+      // This guarantees the UI shows the data regardless of what the database does.
+      setSchedules(result.schedule);
 
-    // 2. Persist the generated schedule to the database
-    // Note: If your API supports bulk insert, use that instead of a loop for better performance.
-    const savePromises = result.schedule.map(entry => {
-      const payload = {
-        faculty_id:       entry.faculty_id,
-        subject_id:       entry.subject_id,
-        room_id:          entry.room_id,
-        day:              entry.day,
-        start_time:       entry.start_time,
-        end_time:         entry.end_time,
-        section:          entry.section,
-        status:           "draft", // Always save as draft initially
-        session_group_id: entry.session_group_id,
-        session_hours:    entry.session_hours,
-      };
-      return fetch(`${API_BASE}/schedules`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload)
+      // 2. Persist the generated schedule to the database in the background
+      const savedEntries =  await Promise.all(result.schedule.map(async (entry) => {
+        const payload = {
+          id:               entry.id,
+          faculty_id:       entry.faculty_id === "TBD" ? null : entry.faculty_id,
+          subject_id:       entry.subject_id,
+          room_id:          entry.room_id === "TBD" ? null : entry.room_id,
+          day:              entry.day === "TBD" ? null : entry.day,
+          start_time:       entry.start_time === "TBD" ? null : entry.start_time,
+          end_time:         entry.end_time === "TBD" ? null : entry.end_time,
+          section:          entry.section,
+          status:           "draft", 
+          session_group_id: entry.session_group_id,
+          session_hours:    entry.session_hours,
+        }
+      
+        const res = await api.post("/manage-schedule/schedules", payload);
+        console.log(`[DB Save] ${payload.subject_id} → status:${res.status}`, res.data);
+        const realId = res.data?.id ?? res.data?.data?.id ?? entry.id;
+        return { ...entry, id: realId };
+      })
+    );
+
+      // We still wait for saves to finish so we don't overwhelm the network,
+      // but we NO LONGER fetch from the empty database to overwrite our UI.
+      setSchedules(savedEntries);
+
+      setScanned(false);
+      setLastReasoning({
+        perProgram:     result.perProgramReasoning,
+        utilization:    result.facultyUtilization,
+        missingEntries: result.missingEntries,
+        wasFixed:       result.wasFixed,
+        apiCalls:       result.apiCallsUsed,
+        sem:            activeSem.sem,
+        schoolYear:     activeSem.schoolYear,
       });
-    });
-
-    await Promise.all(savePromises);
-
-    // 3. Refresh the local state from the database to get the real IDs
-    const refreshRes = await fetch(`${API_BASE}/schedules`, { headers });
-    const freshData = await refreshRes.json();
-    setSchedules(Array.isArray(freshData) ? freshData : freshData.data || []);
-
-    setScanned(false);
-    setLastReasoning({
-      perProgram:     result.perProgramReasoning,
-      utilization:    result.facultyUtilization,
-      missingEntries: result.missingEntries,
-      wasFixed:       result.wasFixed,
-      apiCalls:       result.apiCallsUsed,
-      sem:            activeSem.sem,
-      schoolYear:     activeSem.schoolYear,
-    });
-    
-    setModal("reasoning");
-  } catch (err) {
-    console.error("Persistence failed:", err);
-    alert("Schedule generated but failed to save to database.");
-  } finally {
-    setGenerating(false);
-  }
-};
+      
+      setModal("reasoning");
+    } catch (err) {
+      console.error("Generation/Persistence failed:", err);
+      alert("Schedule generation failed. Check console for details.");
+    } finally {
+      setGenerating(false);
+    }
+  };
   // ✏️ EDIT — replace the setTimeout with your actual Supabase + Gemini API call
 
 // REPLACE WITH:
@@ -1765,7 +1939,7 @@ const handleDelete = async () => {
           </div>
 
           {/* ── Action buttons ── */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             {/* FIX 4: View Reasoning button — only shown when a result exists */}
             {lastReasoning && (
               <button
@@ -1796,6 +1970,19 @@ const handleDelete = async () => {
               <Sparkles size={15}/>
               {scanning ? "Scanning..." : "Run AI Conflict Scan"}
             </button>
+            {/* Publish button — only enabled when there are finalized entries */}
+            <button
+              onClick={handlePublish}
+              disabled={finalized === 0}
+              title={finalized === 0 ? "Finalize schedules first before publishing" : `Publish ${finalized} finalized schedule(s) to faculty profiles`}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all
+                ${finalized === 0
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-200"}`}
+            >
+              <CheckCircle2 size={15}/>
+              Publish{finalized > 0 ? ` (${finalized})` : ""}
+            </button>
             <button
               onClick={() => setModal("add")}
               className="flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-bold shadow-lg shadow-primary/20 transition-colors"
@@ -1809,9 +1996,9 @@ const handleDelete = async () => {
       {/* ── Stat Cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <ScheduleStatCard label="TOTAL ASSIGNMENTS" value={schedules.length} icon={<BookOpen size={22}/>} sub="This semester"/>
-        <ScheduleStatCard label="FINALIZED"         value={finalized}        icon={<ShieldCheck size={22}/>} sub="Published to faculty"/>
-        <ScheduleStatCard label="DRAFT"             value={drafts}           icon={<Clock size={22}/>}   sub="Pending conflict scan"/>
-        <ScheduleStatCard label="FACULTY ASSIGNED"  value={FACULTY_LIST.length} icon={<Users size={22}/>} sub="Active this semester"/>
+        <ScheduleStatCard label="DRAFT"             value={drafts}           icon={<Clock size={22}/>}   sub="AI-generated, pending review"/>
+        <ScheduleStatCard label="FINALIZED"         value={finalized}        icon={<ShieldCheck size={22}/>} sub="Conflict-checked, ready to publish"/>
+        <ScheduleStatCard label="PUBLISHED"         value={published}        icon={<CheckCircle2 size={22}/>} sub="Visible on faculty profiles"/>
       </div>
 
       {/* ── Draft Scan Banner ── */}
@@ -1833,11 +2020,32 @@ const handleDelete = async () => {
         </div>
       )}
 
-      {/* ── All Finalized Banner ── */}
-      {scanned && finalized === schedules.length && schedules.length > 0 && (
+      {/* ── All Finalized Banner — show Publish CTA ── */}
+      {scanned && finalized > 0 && drafts === 0 && (
         <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
           <CheckCircle2 size={18} className="text-green-600 shrink-0"/>
-          <p className="text-sm font-bold text-green-800">All schedules are finalized and published to faculty dashboards.</p>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-green-800">
+              {finalized} schedule{finalized !== 1 ? "s" : ""} finalized — no hard conflicts detected.
+            </p>
+            <p className="text-xs text-green-700 mt-0.5">
+              Click <strong>Publish</strong> to make these visible on faculty profiles.
+            </p>
+          </div>
+          <button
+            onClick={handlePublish}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors"
+          >
+            <CheckCircle2 size={13}/> Publish Now
+          </button>
+        </div>
+      )}
+
+      {/* ── All Published Banner ── */}
+      {published > 0 && finalized === 0 && drafts === 0 && (
+        <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+          <CheckCircle2 size={18} className="text-blue-600 shrink-0"/>
+          <p className="text-sm font-bold text-blue-800">All schedules are published and visible on faculty profiles.</p>
         </div>
       )}
 
@@ -1912,6 +2120,16 @@ const handleDelete = async () => {
                   {ROOM_LIST.map(r=>(
                     <option key={r.id} value={r.id}>{(r as any).room}</option>
                   ))}
+                </select>
+              </div>
+              {/* Status filter */}
+              <div className="flex items-center gap-2 flex-1 min-w-[140px]">
+                <span className="text-xs text-gray-400 shrink-0">Status:</span>
+                <select className={inputCls} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
+                  <option value="All">All Stages</option>
+                  <option value="draft">Draft</option>
+                  <option value="finalized">Finalized</option>
+                  <option value="published">Published</option>
                 </select>
               </div>
             </div>
