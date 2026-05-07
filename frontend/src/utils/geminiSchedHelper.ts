@@ -16,49 +16,36 @@
 //   ✓ Hybrid flow: generate → validate → fix if needed (max 2 API calls)
 // ─────────────────────────────────────────────────────────────────────────────
 import api from "../services/api"; 
+import { toMins, overlaps, DAYS, getSubject} from "./scheduleConflict";
 
 let FACULTY_LIST: any[] = [];
 let SUBJECT_LIST: any[] = [];
 let ROOM_LIST: any[] = [];
 let CURRICULUM: any[] = [];
+let OTHER_FACULTY_LIST: any[] = []; // NEW
+let OTHER_ROOM_LIST: any[] = [];
 
-// Busted cache to guarantee a fresh run without old broken schedules
-const CHECKPOINT_KEY = "deptflow_schedule_checkpoint_v4";
  
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
 // ─────────────────────────────────────────────────────────────────────────────
  
 export interface ScheduleAssignment {
-  id:               string;
-  faculty_id:       string;
-  subject_id:       string;
-  room_id:          string;
-  day:              string;
-  start_time:       string;   // "HH:mm" 24-hour
-  end_time:         string;   // "HH:mm" 24-hour
-  section:          string;
-  status:           "draft" | "finalized" | "published";
-  session_group_id?: string;  // Links split sessions of the same subject together
-  session_hours?:   number;   // Hours for this specific session (for split subjects)
-}
- 
-interface GeminiScheduleItem {
-  faculty_id:        string;
-  subject_id:        string; // This matches your subject_code in V2
-  room_id:           string;
-  day:               string;
-  start_time:        string;
-  end_time:          string;
-  section:           string;
-  session_group_id?: string;
-  session_hours?:    number;
-}
- 
-interface GeminiScheduleResponse {
-  schedule:           GeminiScheduleItem[];
-  reasoning:          string;
-  conflicts_resolved: string[];
+  schedule_id: string;
+  faculty_id: string | null;
+  other_faculty_id?: string | null;      // ← ADD THIS
+  subject_id: string;
+  room_id: string | null;
+  other_room_id?: string | null;         // ← ADD THIS
+  day: string;
+  start_time: string;
+  end_time: string;
+  section: string;
+  status: "draft" | "finalized" | "published";
+  session_group_id?: string | null;
+  session_hours?: number | null;
+  school_year?: number | null; // 🚩 ADD THIS
+  semester?: number | null;    // 🚩 ADD THIS
 }
  
 export interface FacultyUtilization {
@@ -74,12 +61,8 @@ export interface FacultyUtilization {
 export interface GenerationResult {
   schedule:             ScheduleAssignment[];
   reasoning:            string;
-  perProgramReasoning:  Record<string, string>;
-  apiCallsUsed:         1 | 2;
-  conflictsResolved:    string[];
-  wasFixed:             boolean;
   facultyUtilization:   FacultyUtilization[];
-  missingEntries:       MissingEntry[]; // Keep this here
+  missingEntries:       MissingEntry[]; 
 }
  
 export interface ValidationIssue {
@@ -89,53 +72,44 @@ export interface ValidationIssue {
   message: string;
 }
  
-// Faculty shape with the new preferences block
-interface FacultyPreferences {
-  subjectSpecializations: string[];   // subject IDs this faculty can teach
-  unavailableDays:        string[];
-  preferredDays:          string[];
-  unavailableTimeSlots:   string[];   // "HH:mm-HH:mm" strings
-  preferredTimeRange:     { start: string; end: string };
-  preferredRoomTypes:     string[];
-  priority:               "high" | "medium" | "low";
-  maxClassesPerDay:       number;
-  maxConsecutiveHours:    number;
-  notes:                  string;
-}
 
-interface ScheduleCheckpoint {
-  sem:      number;
-  programs: Record<string, GeminiScheduleResponse>; // programName → result
-  savedAt:  number; // timestamp
-}
- 
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-
-
-
-const toMins = (t: string | undefined | null): number => {
-  if (!t || typeof t !== "string" || !t.includes(":")) return 0;
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + (m ?? 0);
+const getFacultyName = (id: string | null, otherId?: string | null): string => {
+  if (!id && !otherId) return "TBD";
+  if (id) {
+    const f = FACULTY_LIST.find(x => x.id === id);
+    if (f) return `${f.personal.firstName} ${f.personal.lastName}`;
+  }
+  if (otherId) {
+    const guest = OTHER_FACULTY_LIST.find(x => x.id === otherId);
+    if (guest) return guest.name; 
+  }
+  
+  return "Guest Faculty"; // Fallback if not found in list
 };
- 
-const overlaps = (aS: string, aE: string, bS: string, bE: string): boolean =>
-  toMins(aS) < toMins(bE) && toMins(aE) > toMins(bS);
- 
-const getFacultyName = (id: string): string => {
-  const f = FACULTY_LIST.find(x => x.id === id);
-  return f ? `${f.personal.firstName} ${f.personal.lastName}` : id;
-};
- 
+
 const getSubjectCode = (id: string): string =>
   SUBJECT_LIST.find(x => x.id === id)?.code ?? id;
  
-const getRoomName = (id: string): string =>
-  ROOM_LIST.find(x => x.id === id)?.room ?? id;
+const getRoomName = (id: string | null, otherId?: string | null): string => {
+  if (!id && !otherId) return "TBD";
+  
+  // 1. Check Official Rooms
+  if (id) {
+    const r = ROOM_LIST.find(x => x.id === id);
+    if (r) return (r as any).room ?? id;
+  }
+  
+  // 2. Check Guest Rooms
+  if (otherId) {
+    const guestRoom = OTHER_ROOM_LIST.find(x => x.id === otherId);
+    if (guestRoom) return guestRoom.name;
+  }
+  
+  return "Guest Room"; // Fallback
+};
+
  
-const getPrefs = (facultyId: string) => {
+const getPrefs = (facultyId: string | null) => {
   const faculty = FACULTY_LIST.find(f => f.id === facultyId);
   if (!faculty) return null;
   
@@ -154,321 +128,7 @@ const getPrefs = (facultyId: string) => {
     maxConsecutiveHours:    prefs.maxConsecutiveHours     ?? 4,
   };
 };
-// ─────────────────────────────────────────────────────────────────────────────
-// CHECKPOINT SYSTEM
-// ─────────────────────────────────────────────────────────────────────────────
 
-function saveCheckpoint(sem: number, programName: string, result: GeminiScheduleResponse) {
-  try {
-    const raw = localStorage.getItem(CHECKPOINT_KEY);
-    const existing: ScheduleCheckpoint = raw
-      ? JSON.parse(raw)
-      : { sem, programs: {}, savedAt: Date.now() };
-
-    // If semester changed, reset checkpoint
-    if (existing.sem !== sem) {
-      existing.programs = {};
-      existing.sem = sem;
-    }
-
-    existing.programs[programName] = result;
-    existing.savedAt = Date.now();
-    localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(existing));
-    console.log(`[DeptFlow] ✓ Checkpoint saved for ${programName}`);
-  } catch (e) {
-    console.warn("[DeptFlow] Could not save checkpoint:", e);
-  }
-}
-
-function loadCheckpoint(sem: number): Record<string, GeminiScheduleResponse> {
-  try {
-    const raw = localStorage.getItem(CHECKPOINT_KEY);
-    if (!raw) return {};
-    const checkpoint: ScheduleCheckpoint = JSON.parse(raw);
-
-    // Ignore checkpoints older than 2 hours or from a different semester
-    const twoHours = 2 * 60 * 60 * 1000;
-    if (checkpoint.sem !== sem || Date.now() - checkpoint.savedAt > twoHours) {
-      localStorage.removeItem(CHECKPOINT_KEY);
-      return {};
-    }
-
-    const programs = Object.keys(checkpoint.programs);
-    if (programs.length > 0) {
-      console.log(`[DeptFlow] 📂 Checkpoint found — already done: [${programs.join(", ")}]`);
-    }
-    return checkpoint.programs;
-  } catch (e) {
-    console.warn("[DeptFlow] Could not load checkpoint:", e);
-    return {};
-  }
-}
-
-function clearCheckpoint() {
-  localStorage.removeItem(CHECKPOINT_KEY);
-  console.log("[DeptFlow] Checkpoint cleared.");
-}
-// ─────────────────────────────────────────────────────────────────────────────
-// CONSTRAINTS BUILDER
-// ─────────────────────────────────────────────────────────────────────────────
-
-function buildConstraints(semFilter: 1 | 2 = 1) {
-  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  const TIME_SLOTS = [
-    "07:00-08:00", "08:00-09:00", "09:00-10:00", "10:00-11:00",
-    "11:00-12:00", "13:00-14:00", "14:00-15:00", "15:00-16:00",
-    "16:00-17:00", "17:00-18:00", "18:00-19:00", "19:00-20:00"
-  ];
- 
-  return {
-    professors: FACULTY_LIST.map(f => {
-      const prefs = "preferences" in f ? (f as any).preferences as FacultyPreferences : null;
-      return {
-        id:                   f.id,
-        name:                 `${f.personal.firstName} ${f.personal.lastName}`,
-        employmentType:       f.personal.employmentType,
-        maxUnits:             f.personal.employmentType === "Part-time" ? 12 : 21,
-        // Preferences — fall back to permissive defaults if not set
-        subjectSpecializations: prefs?.subjectSpecializations ?? [],
-        unavailableDays:        prefs?.unavailableDays ?? [],
-        preferredDays:          prefs?.preferredDays ?? DAYS,
-        unavailableTimeSlots:   prefs?.unavailableTimeSlots ?? [],
-        preferredTimeRange:     prefs?.preferredTimeRange ?? { start: "07:00", end: "18:00" },
-        preferredRoomTypes:     prefs?.preferredRoomTypes ?? ["lab", "lecture"],
-        priority:               prefs?.priority ?? "medium",
-        maxClassesPerDay:       prefs?.maxClassesPerDay ?? 3,
-        maxConsecutiveHours:    prefs?.maxConsecutiveHours ?? 4,
-        notes:                  prefs?.notes ?? "",
-      };
-    }),
- 
-    rooms: ROOM_LIST.map(r => ({
-      id:       r.id,
-      name:     (r as any).room ?? r.id,
-      type:     (r as any).type ?? "lecture",
-      capacity: (r as any).capacity ?? 40,
-    })),
- 
-    subjects: SUBJECT_LIST.map(s => ({
-      id:             s.id,
-      code:           s.code,
-      name:           s.name,
-      units:          s.units,
-      yearLevel:      (s as any).yearLevel      ?? null,
-      semester:       (s as any).semester       ?? null,
-      programs:       (s as any).programs       ?? [],
-      assignmentMode: (s as any).assignmentMode ?? "auto",  // "auto" | "manual-faculty"
-      facilityType:   (s as any).facilityType   ?? "lecture",
-      canSplit:       (s as any).canSplit        ?? false,
-      splitPattern:   (s as any).splitPattern    ?? null,
-      notes:          (s as any).notes           ?? "",
-    })),
- 
-    days:      DAYS,
-    timeSlots: TIME_SLOTS,
- 
-    // Curriculum — flat sections array filtered to the requested semester only.
-    // New structure: each program has a sections[] array where every entry
-    // already has yearLevel, semester, section, label, and subjectIds at the
-    // top level — no more nested years → semesters → sections traversal.
-    sections: (CURRICULUM as any[]).flatMap(program =>
-      (program.sections as any[])
-        .filter(s => s.semester === semFilter)
-        .map(s => ({
-          label:      s.label,
-          program:    program.program,
-          year:       s.yearLevel,
-          sem:        s.semester,
-          section:    s.section,
-          subjectIds: s.subjectIds,
-        }))
-    ),
- 
-    rules: [
-      "HARD: A professor can only teach one class at a time — no double-booking",
-      "HARD: A room can only host one class at a time — no room double-booking",
-      "HARD: Full-time faculty maximum is 21 units per semester",
-      "HARD: Part-time faculty maximum is 12 units per semester",
-      "HARD: Only assign a subject to a faculty whose subjectSpecializations includes that subject ID",
-      "HARD: Only assign a lab subject to a room of type 'lab'; lecture subjects to 'lecture' rooms",
-      "HARD: Do not schedule a faculty on their unavailableDays",
-      "HARD: Do not schedule a faculty during their unavailableTimeSlots",
-      "HARD: Respect each faculty's maxClassesPerDay limit",
-      "HARD: Respect each faculty's maxConsecutiveHours limit",
-      "HARD: LAB-LEC PAIRING — If a subject has both a Lab variant and a Lecture variant for the SAME section, BOTH must be assigned to the SAME faculty member...",
-      "HARD: LAB HOUR EXCEPTION — Lab subjects are worth 1 credit unit but are allotted 2 hours of actual teaching time...",
-      "HARD: NSTP SUNDAY — All NSTP subjects MUST be scheduled on Sunday.",
-      "SOFT: Prefer scheduling faculty on their preferredDays when possible",
-      "SOFT: Prefer scheduling faculty within their preferredTimeRange",
-      "SOFT: Prefer matching faculty's preferredRoomTypes",
-      "SOFT: High-priority faculty get first choice of preferred days and times",
-      "SOFT: Distribute workload as evenly as possible across faculty",
-      "SPLIT RULE: If a subject has canSplit=true and a splitPattern (e.g. [1,2]), you MAY schedule it as two separate entries with the same session_group_id. The hours of both sessions must sum exactly to the subject's units. Use different days for each session.",
-      "SPLIT RULE: Subjects with canSplit=false must be scheduled as a single continuous block.",
-      "1 unit = 1 hour of class time (EXCEPTION: lab subjects = 1 unit but 2 clock hours)",
-    ],
-  };
-}
- 
-// ─────────────────────────────────────────────────────────────────────────────
-// PROMPT BUILDERS
-// ─────────────────────────────────────────────────────────────────────────────
- 
-function buildGenerationPrompt(c: ReturnType<typeof buildConstraints>, currentSched: ScheduleAssignment[] = []): string {
-  // FIX 1: Show each faculty's CURRENT unit total so Gemini can enforce the cap.
-  // FIX 3: "remaining" field nudges Gemini to use under-utilised faculty first.
-  const facultyBlock = c.professors.map(p => {
-    const currentUnits = currentSched
-      .filter(s => s.faculty_id === p.id)
-      .filter((s, _, arr) => {
-        if (!s.session_group_id) return true;
-        return arr.findIndex(x => x.session_group_id === s.session_group_id) === arr.indexOf(s);
-      })
-      .reduce((n, s) => n + (SUBJECT_LIST.find(x => x.id === s.subject_id)?.units ?? 0), 0);
-    const remaining = p.maxUnits - currentUnits;
-    return (
-      `id:${p.id} name:${p.name}|${p.employmentType}|max:${p.maxUnits}u` +
-      `|used:${currentUnits}u|remaining:${remaining}u|priority:${p.priority}` +
-      `|teaches:[${p.subjectSpecializations.join(",")}]` +
-      `|unavailDays:[${p.unavailableDays.join(",") || "none"}]` +
-      `|prefDays:[${p.preferredDays.join(",")}]` +
-      `|blockedSlots:[${p.unavailableTimeSlots.join(",") || "none"}]` +
-      `|prefTime:${p.preferredTimeRange.start}-${p.preferredTimeRange.end}` +
-      `|prefRooms:[${p.preferredRoomTypes.join(",")}]` +
-      `|maxPerDay:${p.maxClassesPerDay}|maxConsec:${p.maxConsecutiveHours}hrs`
-    );
-  }).join("\n");
- 
-  const roomBlock = c.rooms.map(r =>
-    `id:${r.id} name:${r.name}|${r.type}|cap:${r.capacity}`
-  ).join("\n");
- 
-  const subjectBlock = c.subjects.map(s =>
-    `id:${s.id} code:${s.code}|${s.units}u|${s.facilityType}` +
-    `|yr:${(s as any).yearLevel ?? "?"}|sem:${(s as any).semester ?? "?"}` +
-    `|split:${s.canSplit ? s.splitPattern?.join("+") + "hrs" : "NO"}`
-  ).join("\n");
- 
-  const hardRules = c.rules
-    .filter(r => r.startsWith("HARD") || r.startsWith("SPLIT") || r.startsWith("1 unit"))
-    .map((r, i) => `${i + 1}. ${r}`)
-    .join("\n");
- 
-  // Curriculum block — one line per section showing exactly which subjects it needs
-  const curriculumBlock = (c as any).sections.map((sec: any) =>
-    `${sec.label}(${sec.program} Y${sec.year} Sem${sec.sem})|needs:[${sec.subjectIds.join(",")}]`
-  ).join("\n");
-
-  return `
-You are a university schedule generator for TUP (Philippines).
-Generate a schedule for ALL sections across ALL programs (BSCS, BSIT, BSIS).
-Each section needs one schedule entry per subject in its curriculum.
-"reasoning"=10 words max. "conflicts_resolved"=[].
- 
-FACULTY:
-${facultyBlock}
- 
-ROOMS:
-${roomBlock}
- 
-SUBJECTS (id|code|units|facilityType|split):
-${subjectBlock}
- 
-DAYS: ${c.days.join(",")} (NOTE: NSTP subjects must use Sunday)
-HOURS: 07:00,08:00,09:00,10:00,11:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00
-start_time = when class begins. end_time = start + subject units (e.g. 3u subject at 07:00 → start_time:"07:00" end_time:"10:00").
-EXCEPTION: lab subjects always end_time = start_time + 2hrs regardless of unit count.
-
-
-
-HARD RULES:
-${hardRules}
- 
-SECTIONS AND THEIR REQUIRED SUBJECTS (section|needs:[subjectIds]):
-${curriculumBlock}
-
-INSTRUCTIONS:
-- Produce exactly the entries listed above — no more, no fewer.
-- CRITICAL: For subject_id, you MUST use the exact id values from the SUBJECTS list above. For room_id, use exact id values from the ROOMS list. NEVER invent, shorten, or guess IDs.
-- CRITICAL RULE: For subjects marked with '|manual' (e.g. GE, MATH, PE, NSTP), you MUST schedule the day, room, and time normally, but you MUST set "faculty_id": "TBD". Do NOT assign a real faculty to them!
-- If a room/time conflict occurs, prioritize assigning the subject anyway; the Local Validator will flag it for the Fix Round.
-- SOFT RULE: Try to respect maxConsecutiveHours, but do not skip an assignment just to meet this rule.
-- LOAD SPREADING: Ensure no qualified faculty is left with 0 units if there are subjects they can teach.
-
-  REQUIRED SCHEMA ENFORCEMENT: 
-  You MUST provide a valid day from the DAYS list and a valid time from the HOURS list for EVERY entry. 
-  If you cannot find a valid slot without breaking a rule, YOU MUST DELIBERATELY CREATE A CONFLICT. 
-  If stuck, forcefully assign "day": "Monday" and "start_time": "07:00". 
-  Leaving a field blank or outputting "" is a catastrophic failure. The Local Validator will catch the conflict later.
- 
-SPLIT: If subject split=YES, output 2 entries with same session_group_id, different days, session_hours summing to units.
- 
-OUTPUT — JSON only, no markdown:
-{"schedule":[{"faculty_id":"<exact id from FACULTY list>","subject_id":"<exact id from SUBJECTS list>","room_id":"<exact id from ROOMS list>","day":"","start_time":"HH:mm","end_time":"HH:mm","section":"BSCS 1-A","session_group_id":"","session_hours":0}],"reasoning":"","conflicts_resolved":[]}
-
-Omit session_group_id and session_hours for non-split entries.
-JSON only.
-`.trim();
-}
- 
-function buildFixPrompt(
-  c: ReturnType<typeof buildConstraints>,
-  draft: ScheduleAssignment[],
-  issues: ValidationIssue[],
-  currentSched: ScheduleAssignment[] = []): string {
- 
-  const scheduleText = draft.map(s =>
-    `${s.id}|faculty:${s.faculty_id}|subject:${s.subject_id}|room:${s.room_id}|${s.day}|${s.start_time}-${s.end_time}|${s.section}` +
-    (s.session_group_id ? `|grp:${s.session_group_id}(${s.session_hours}hr)` : "")
-  ).join("\n");
- 
-  const issueText = issues.map(i => `[${i.type}] ${i.label}: ${i.message}`).join("\n");
- 
-  // Show remaining capacity per faculty so Gemini picks correct reassignment targets
-  const facultySummary = c.professors.map(p => {
-    const used = currentSched
-      .filter(s => s.faculty_id === p.id)
-      .filter((s, _, arr) => {
-        if (!s.session_group_id) return true;
-        return arr.findIndex(x => x.session_group_id === s.session_group_id) === arr.indexOf(s);
-      })
-      .reduce((n, s) => n + (SUBJECT_LIST.find(x => x.id === s.subject_id)?.units ?? 0), 0);
-    return `id:${p.id} ${p.name}|teaches:[${p.subjectSpecializations.join(",")}]|unavail:[${p.unavailableDays.join(",") || "none"}]|blocked:[${p.unavailableTimeSlots.join(",") || "none"}]|max/day:${p.maxClassesPerDay}|used:${used}u|remaining:${p.maxUnits - used}u`;
-  }).join("\n");
-  return `
-  You are a university schedule fixer for TUP. Fix ALL violations below. Keep unchanged entries identical.
-  "reasoning"=10 words max. Return COMPLETE schedule.
-  
-  DRAFT (id|faculty_id|subject_id|room_id|day|time|section):
-  ${scheduleText}
-  
-  VIOLATIONS:
-  ${issueText}
-  
-  FACULTY: ${facultySummary}
-  ROOMS: ${c.rooms.map(r => `id:${r.id} ${r.name}(${r.type})`).join("|")}
-  SUBJECTS: ${c.subjects.map(s => `id:${s.id} ${s.code}(${s.facilityType})`).join("|")}
-  DAYS: ${c.days.join(",")} (NOTE: NSTP subjects must use Sunday)
-  HOURS: 07:00,08:00,09:00,10:00,11:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00
-  start_time = when class begins. end_time = start + subject units (e.g. 3u subject at 07:00 → start_time:"07:00" end_time:"10:00"). 
-  EXCEPTION: lab subjects always end_time = start_time + 2hrs regardless of unit count.
-
-
-
-- faculty_id: exact id from FACULTY list (e.g. "uuid-here"). CRITICAL: If subject is marked '|manual', leave as "TBD".
-- subject_id: exact subject_code from SUBJECTS list (e.g. "COSC101")
-- room_id:    exact id from ROOMS list (e.g. "room-uuid-here")
-
-  REQUIRED SCHEMA ENFORCEMENT: 
-  You MUST provide a valid day from the DAYS list and a valid time from the HOURS list for EVERY entry. 
-  If you cannot find a valid slot without breaking a rule, YOU MUST DELIBERATELY CREATE A CONFLICT. 
-  If stuck, forcefully assign "day": "Monday" and "start_time": "07:00". 
-  Leaving a field blank or outputting "" is a catastrophic failure. The Local Validator will catch the conflict later.
-
-OUTPUT — JSON only:
-{"schedule":[{"faculty_id":"3","subject_id":"CC113-M","room_id":"2","day":"Monday","start_time":"08:00","end_time":"09:00","section":"","session_group_id":"","session_hours":0}],"reasoning":"","conflicts_resolved":[]}
-`.trim();
-}
  
 // ─────────────────────────────────────────────────────────────────────────────
 // LOCAL VALIDATOR — Extended
@@ -499,7 +159,7 @@ export function validateLocally(sched: ScheduleAssignment[]): ValidationIssue[] 
   valid.forEach((a, i) => {
     valid.forEach((b, j) => {
       if (j <= i) return;
-      const key = [a.id, b.id].sort().join("|");
+      const key = [a.schedule_id, b.schedule_id].sort().join("|");
       if (seen.has(key)) return;
  
       const sameGroup = a.session_group_id && a.session_group_id === b.session_group_id;
@@ -561,7 +221,7 @@ export function validateLocally(sched: ScheduleAssignment[]): ValidationIssue[] 
       // HARD: faculty unavailable on this day
       if (prefs.unavailableDays.includes(a.day)) {
         results.push({
-          id:      `unavailday-${a.id}`,
+          id:      `unavailday-${a.schedule_id}`,
           type:    "HARD",
           label:   "Faculty Day Unavailability",
           message: `${fname} is not available on ${a.day} but is scheduled to teach ${scode}.`,
@@ -573,7 +233,7 @@ export function validateLocally(sched: ScheduleAssignment[]): ValidationIssue[] 
         const [bS, bE] = blocked.split("-");
         if (overlaps(a.start_time, a.end_time, bS, bE)) {
           results.push({
-            id:      `unavailtime-${a.id}-${blocked}`,
+            id:      `unavailtime-${a.schedule_id}-${blocked}`,
             type:    "HARD",
             label:   "Faculty Time Unavailability",
             message: `${fname} is unavailable during ${blocked} but ${scode} is scheduled ` +
@@ -635,7 +295,7 @@ export function validateLocally(sched: ScheduleAssignment[]): ValidationIssue[] 
         toMins(a.end_time)   > toMins(prefs.preferredTimeRange.end)
       ) {
         results.push({
-          id:      `preftime-${a.id}`,
+          id:      `preftime-${a.schedule_id}`,
           type:    "SOFT",
           label:   "Outside Preferred Time",
           message: `${fname} prefers ${prefs.preferredTimeRange.start}–${prefs.preferredTimeRange.end} ` +
@@ -646,7 +306,7 @@ export function validateLocally(sched: ScheduleAssignment[]): ValidationIssue[] 
       // SOFT: scheduled on non-preferred day
       if (!prefs.preferredDays.includes(a.day)) {
         results.push({
-          id:      `prefday-${a.id}`,
+          id:      `prefday-${a.schedule_id}`,
           type:    "SOFT",
           label:   "Non-Preferred Day",
           message: `${fname} prefers ${prefs.preferredDays.join("/")} but ${scode} ` +
@@ -661,7 +321,7 @@ export function validateLocally(sched: ScheduleAssignment[]): ValidationIssue[] 
       const roomType     = room.type ?? "lecture";
       if (requiredType !== roomType) {
         results.push({
-          id:      `facility-${a.id}`,
+          id:      `facility-${a.schedule_id}`,
           type:    "HARD",
           label:   "Wrong Facility Type",
           message: `${scode} requires a ${requiredType} room but is assigned to ` +
@@ -673,7 +333,7 @@ export function validateLocally(sched: ScheduleAssignment[]): ValidationIssue[] 
     // HARD: load overload
     const fData = FACULTY_LIST.find(x => x.id === a.faculty_id);
     if (fData) {
-      const maxUnits   = fData.personal.employmentType === "Part-time" ? 12 : 21;
+      const maxUnits   = fData.personal.employmentType === "Part-Time" ? 12 : 21;
       const totalUnits = valid
         .filter(s => s.faculty_id === a.faculty_id)
         // For split sessions, only count units once per session_group
@@ -827,29 +487,19 @@ function validateLabLecPairing(sched: ScheduleAssignment[]): ValidationIssue[] {
       if (!labSub) return;
 
       // Extract a "base name" by stripping "Lab"/"Lec" suffix and normalizing
-      const labBase = labSub.code
-        .replace(/\s*(lab|laboratory)\s*$/i, "")
-        .replace(/\s*(lec|lecture)\s*$/i, "")
-        .trim()
-        .toUpperCase();
+      const getCourseBase = (code: string) => code.replace(/(1L|2L|1|2)(-[A-Z0-9]+)?$/i, "").trim().toUpperCase();
+      
+      const labBase = getCourseBase(labSub.code);
 
       lectures.forEach(lec => {
-
-        const lecSub = SUBJECT_LIST.find(x => x.id === lec.subject_id) as any;
-
+        const lecSub = getSubject(lec.subject_id); // Note: in geminiSchedHelper it's casted as 'as any'
         if (!lecSub) return;
-
-        const lecBase = lecSub.code
-          .replace(/\s*(lab|laboratory)\s*$/i, "")
-          .replace(/\s*(lec|lecture)\s*$/i, "")
-          .trim()
-          .toUpperCase();
-
+        const lecBase = getCourseBase(lecSub.code);
         if (labBase !== lecBase) return; // different subjects, skip
         if (lab.faculty_id === lec.faculty_id) return; // correctly paired, skip
         if (lab.faculty_id === "TBD" || lec.faculty_id === "TBD") return; // TBD — skip
         
-        const pairKey = [lab.id, lec.id].sort().join("|");
+        const pairKey = [lab.schedule_id, lec.schedule_id].sort().join("|");
         
         if (seen.has(pairKey)) return;
         seen.add(pairKey);
@@ -888,7 +538,7 @@ function validateNstpSunday(sched: ScheduleAssignment[]): ValidationIssue[] {
     }).map(s => {
       const sub = SUBJECT_LIST.find(x => x.id === s.subject_id) as any;
       return {
-        id:      `nstp-day-${s.id}`,
+        id:      `nstp-day-${s.schedule_id}`,
         type:    "HARD" as const,
         label:   "NSTP Must Be Sunday",
         message: `${sub?.code ?? s.subject_id} (${s.section}) is scheduled on ${s.day}. ` +
@@ -922,7 +572,7 @@ function validateLabHours(sched: ScheduleAssignment[]): ValidationIssue[] {
       const fixedEnd = `${String(Math.floor(endMins / 60)).padStart(2,"0")}:${String(endMins % 60).padStart(2,"0")}`;
       
       return {
-        id:      `labhr-${s.id}`,
+        id:      `labhr-${s.schedule_id}`,
         type:    "HARD" as const,
         label:   "Lab Requires 2 Clock Hours",
         message: `${sub?.code ?? s.subject_id} (${s.section}) is a lab subject (1 unit = 2 clock hrs) ` +
@@ -934,485 +584,7 @@ function validateLabHours(sched: ScheduleAssignment[]): ValidationIssue[] {
 
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GEMINI API CALLER
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. Use the newer Gemini 2.5 Flash model (best for reasoning + JSON)
-const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
-const GEMINI_API_URL = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`;
-
-
-async function callGemini(prompt: string): Promise<GeminiScheduleResponse> {
  
-  const response = await fetch(GEMINI_API_URL, {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        temperature:      0.1,
-        maxOutputTokens:  65536,
-        // ─── KEY FIX ────────────────────────────────────────────────────────
-        // Gemini 2.5 Flash uses "thinking tokens" by default. These tokens are
-        // generated BEFORE the JSON response and consume the same output budget.
-        // With a complex schedule prompt, thinking alone can use 10 000-30 000
-        // tokens, leaving too little room for the full JSON — causing the
-        // "truncated mid-response" error even at maxOutputTokens: 65536.
-        // Setting thinkingBudget: 0 disables thinking entirely, ensuring the
-        // full token budget is available for the JSON output.
-        // ────────────────────────────────────────────────────────────────────
-        thinkingConfig: { thinkingBudget: 0 },
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            schedule: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  faculty_id: { type: "STRING" },
-                  subject_id: { type: "STRING" },
-                  room_id: { type: "STRING" },
-                  day: { type: "STRING" }, // Forces this key to exist
-                  start_time: { type: "STRING" },
-                  end_time: { type: "STRING" },
-                  section: { type: "STRING" },
-                  session_group_id: { type: "STRING" },
-                  session_hours: { type: "NUMBER" }
-                },
-                required: ["faculty_id", "subject_id", "room_id", "day", "start_time", "end_time", "section"] // The ultimate enforcer
-              }
-            },
-            reasoning: { type: "STRING" },
-            conflicts_resolved: { type: "ARRAY", items: { type: "STRING" } }
-          },
-          required: ["schedule", "reasoning", "conflicts_resolved"]
-        }
-      },
-    }),
-  });
- 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Gemini API error ${response.status}: ${err}`);
-  }
- 
-  const data         = await response.json();
-  const finishReason = (data?.candidates?.[0]?.finishReason ?? "UNKNOWN") as string;
-  const raw          = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
- 
-  if (finishReason === "MAX_TOKENS") {
-    console.warn("[DeptFlow] ⚠ Response hit MAX_TOKENS — attempting partial rescue...");
-  } else {
-    console.log(`[DeptFlow] Gemini finish reason: ${finishReason}`);
-  }
- 
-  if (!raw) throw new Error("[DeptFlow] Gemini returned an empty response.");
- 
-  const clean = raw
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim();
- 
-  return parseGeminiScheduleResponse(clean, finishReason);
-}
- 
-// ─────────────────────────────────────────────────────────────────────────────
-// RESCUE HELPERS
-// Three-stage approach so we always salvage what Gemini managed to emit:
-//   Stage 1 — full JSON.parse (happy path, no truncation)
-//   Stage 2 — bracket-matching (only the reasoning suffix was cut)
-//   Stage 3 — object extraction (the array itself was cut; recover every
-//              complete { } object we can find)
-// ─────────────────────────────────────────────────────────────────────────────
- 
-/**
- * Walks `text` from `fromIndex` and returns every complete JSON object
- * (balanced `{ … }` pair) it can parse. Used when the outer `[]` array
- * bracket is never closed due to truncation.
- */
-function extractCompleteJsonObjects(
-  text: string,
-  fromIndex: number
-): GeminiScheduleItem[] {
-  const items: GeminiScheduleItem[] = [];
-  let depth = 0;
-  let objStart = -1;
- 
-  for (let i = fromIndex; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === "{") {
-      if (depth === 0) objStart = i;
-      depth++;
-    } else if (ch === "}") {
-      depth--;
-      if (depth === 0 && objStart !== -1) {
-        try {
-          const obj = JSON.parse(text.slice(objStart, i + 1)) as GeminiScheduleItem;
-          // Minimal validity guard — must have the four required fields
-          if (obj.faculty_id && obj.subject_id && obj.room_id && obj.day) {
-            items.push(obj);
-          }
-        } catch {
-          // skip malformed object
-        }
-        objStart = -1;
-      }
-    }
-  }
- 
-  return items;
-}
-
-function parseGeminiScheduleResponse(
-  raw: string,
-  finishReason = "UNKNOWN"
-): GeminiScheduleResponse {
-
-  // ── Stage 0: bare array (Gemini skipped the wrapper object) ───────────────
-  // When responseMimeType:"application/json" + thinkingBudget:0 are combined,
-  // Gemini 2.5 Flash sometimes returns a raw array [ {...}, {...} ] instead of
-  // the expected { "schedule": [...] } wrapper. Detect and handle this first.
-  if (raw.trimStart().startsWith("[")) {
-    try {
-      const arr = JSON.parse(raw) as GeminiScheduleItem[];
-      if (Array.isArray(arr) && arr.length > 0) {
-        console.warn("[DeptFlow] Gemini returned a bare array — wrapping into schedule object.");
-        return { schedule: arr, reasoning: "Bare array response handled.", conflicts_resolved: [] };
-      }
-    } catch {
-      // not a valid array — fall through to normal stages
-    }
-  }
-
-  // ── Stage 1: full parse (no truncation) ───────────────────────────────────
-  try {
-    const parsed = JSON.parse(raw) as GeminiScheduleResponse;
-    if (!Array.isArray(parsed.schedule)) throw new Error("Missing schedule array");
-    return parsed;
-  } catch {
-    // fall through
-  }
-
-  console.warn("[DeptFlow] Full JSON parse failed — attempting rescue...");
-
-  // ── Locate the schedule array start ───────────────────────────────────────
-  const keyIdx     = raw.indexOf('"schedule"');
-  const arrayStart = raw.indexOf("[", keyIdx);
-
-  if (keyIdx === -1 || arrayStart === -1) {
-    throw new SyntaxError(
-      "[DeptFlow] Cannot locate 'schedule' array in Gemini response." +
-      (finishReason === "MAX_TOKENS" ? " Response was cut off by the token limit." : "")
-    );
-  }
-
-  // ── Stage 2: bracket-matching (suffix truncated, array intact) ────────────
-  let arrayEnd = -1;
-  let depth2   = 0;
-  for (let i = arrayStart; i < raw.length; i++) {
-    if (raw[i] === "[" || raw[i] === "{") depth2++;
-    if (raw[i] === "]" || raw[i] === "}") depth2--;
-    if (depth2 === 0) { arrayEnd = i; break; }
-  }
-
-  if (arrayEnd !== -1) {
-    try {
-      const schedule = JSON.parse(raw.slice(arrayStart, arrayEnd + 1)) as GeminiScheduleItem[];
-      if (Array.isArray(schedule) && schedule.length > 0) {
-        console.warn("[DeptFlow] Response suffix truncated — array rescued successfully.");
-        return { schedule, reasoning: "Rescued: suffix truncated.", conflicts_resolved: [] };
-      }
-    } catch {
-      // fall through to stage 3
-    }
-  }
-
-  // ── Stage 3: object extraction (array itself truncated mid-entry) ─────────
-  const items = extractCompleteJsonObjects(raw, arrayStart);
-
-  if (items.length === 0) {
-    throw new SyntaxError(
-      finishReason === "MAX_TOKENS"
-        ? "[DeptFlow] Token limit hit before any entries were written. " +
-          "Reduce scope or retry — thinkingBudget:0 should prevent this."
-        : "[DeptFlow] Schedule array truncated mid-response. Try again."
-    );
-  }
-
-  console.warn(
-    `[DeptFlow] Array truncated — ${items.length} complete entries rescued via object extraction.`
-  );
-  return {
-    schedule:           items,
-    reasoning:          `Partial rescue: ${items.length} entries recovered.`,
-    conflicts_resolved: [],
-  };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESPONSE CONVERTER
-// ─────────────────────────────────────────────────────────────────────────────
-
-function normalizeGeminiItem(item: GeminiScheduleItem): GeminiScheduleItem {
-  let { faculty_id, subject_id, room_id } = item;
-
-  const stripPrefix = (val: string, prefix: string) =>
-    val.startsWith(prefix) ? val.slice(prefix.length) : val;
-
-  subject_id = stripPrefix(String(subject_id ?? "").trim(), "subject:");
-  room_id    = stripPrefix(String(room_id    ?? "").trim(), "room:");
-  faculty_id = stripPrefix(String(faculty_id ?? "").trim(), "faculty:");
-
-  // ── subject_id Normalization ──
-  const rawSubject = String(subject_id ?? "").trim();
-  if (rawSubject && !SUBJECT_LIST.find(s => s.id === rawSubject)) {
-    const normalizedSearch = rawSubject.replace(/\s+/g, "").toUpperCase();
-    
-    const byCode = SUBJECT_LIST.find(s => {
-      // FIX: Add optional chaining and null check for s.code
-      const code = s.code?.replace(/\s+/g, "").toUpperCase();
-      return code === normalizedSearch;
-    });
-    
-    if (byCode) subject_id = byCode.id;
-  }
-
-  // ── room_id Normalization ──
-  const rawRoom = String(room_id ?? "").trim();
-  if (rawRoom && !ROOM_LIST.find(r => r.id === rawRoom)) {
-    const byName = ROOM_LIST.find(r => 
-      // FIX: Ensure r.room exists before calling toLowerCase
-      (r.room || "").toLowerCase() === rawRoom.toLowerCase()
-    );
-    if (byName) room_id = byName.id;
-  }
-
-  const normalizeTime = (t: any): string => {
-  if (!t || String(t).trim() === "") {
-  console.warn("[DeptFlow] normalizeTime: received empty time value from Gemini");
-  return "";
-  }
-  const s = String(t).trim();
-
-  // Already correct "HH:mm" format
-  if (/^\d{2}:\d{2}$/.test(s)) return s;
-
-  // "H:mm" → "0H:mm"
-  if (/^\d{1}:\d{2}$/.test(s)) return `0${s}`;
-
-  // "HH:mm:ss" → strip seconds
-  if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s.slice(0, 5);
-
-  // "07:00-10:00" — Gemini put the full range in start_time
-  // Split it: first part = start, second part = end
-  if (s.includes("-") && s.indexOf("-") > 2) {
-    return s.split("-")[0].trim();  // caller handles end separately
-  }
-
-  return s; // fallback — let the filter catch it
-};
-
-const rawStart = String(item.start_time ?? "").trim();
-const rawEnd   = String(item.end_time   ?? "").trim();
-
-let start_time = item.start_time;
-let end_time   = item.end_time;
-
-if (rawStart.includes("-") && rawStart.indexOf("-") > 2 && !rawEnd) {
-  const parts = rawStart.split("-");
-  start_time = normalizeTime(parts[0]);
-  end_time   = normalizeTime(parts[1]);
-} else {
-  start_time = normalizeTime(rawStart);
-  end_time   = normalizeTime(rawEnd);
-}
-
-  return { ...item, faculty_id, subject_id, room_id, start_time, end_time};
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// RESPONSE CONVERTER
-// ─────────────────────────────────────────────────────────────────────────────
- 
-function toScheduleAssignments(items: GeminiScheduleItem[]): ScheduleAssignment[] {
-  // Step 1: normalize IDs (strip prefixes, resolve by name/code if needed)
-  const normalized = items.map(normalizeGeminiItem);
- 
-  // Step 2: drop entries still missing required fields after normalization.
-  // faculty_id may be "TBD" for manual-faculty subjects (GE/MATH) — allow it.
-  const complete = normalized
-  .filter(item =>
-    item.faculty_id && item.subject_id && item.room_id && item.section &&
-    (item.faculty_id === "TBD" || FACULTY_LIST.find(f => f.id === item.faculty_id)) &&
-    SUBJECT_LIST.find(s => s.id === item.subject_id) &&
-    (ROOM_LIST as any[]).find((r: any) => r.id === item.room_id)
-  )
-  .map(item => {
-    // If time is missing, assign a fallback so the entry isn't lost
-    // Admin can fix it manually — it will show as a conflict in validation
-    if (!item.start_time || !item.end_time) {
-      const sub = SUBJECT_LIST.find(s => s.id === item.subject_id);
-      const units = sub?.units ?? 1;
-      console.warn(`[DeptFlow] Missing time for ${item.subject_id} in ${item.section} — defaulting to 07:00`);
-      return {
-        ...item,
-        start_time: "07:00",
-        end_time: `${String(7 + units).padStart(2, "0")}:00`,
-      };
-    }
-    return item;
-  });
- 
-  return complete.map((item, idx) => {
-    // PROGRAMMATIC OVERRIDE:
-    // Ensure that even if the AI disobeys and assigns a faculty to a manual subject,
-    // we forcibly wipe it out and set it to "TBD".
-    const sub = SUBJECT_LIST.find(s => s.id === item.subject_id);
-    const finalFacultyId = sub?.assignmentMode === "manual" ? "TBD" : item.faculty_id;
-
-    return {
-      id:               `gen-${Date.now()}-${idx}`,
-      faculty_id:       finalFacultyId,
-      subject_id:       item.subject_id,
-      room_id:          item.room_id,
-      day:              item.day,
-      start_time:       item.start_time,
-      end_time:         item.end_time,
-      section:          String(item.section ?? "").trim(),
-      status:           "draft" as const,
-      session_group_id: item.session_group_id,
-      session_hours:    item.session_hours,
-    };
-  });
-}
- 
-// ─────────────────────────────────────────────────────────────────────────────
-// PER-PROGRAM PROMPT BUILDER
-// Builds a generation prompt scoped to a single program only.
-// Called in parallel for BSCS, BSIT, BSIS — each call is ~3x smaller and
-// ~3x faster than one monolithic call covering all programs at once.
-// ─────────────────────────────────────────────────────────────────────────────
- 
-function buildProgramPrompt(
-  c: ReturnType<typeof buildConstraints>,
-  programName: string,
-  _currentSched: ScheduleAssignment[] = []
-): string {
-  const programSections = (c as any).sections.filter(
-    (s: any) => s.program === programName
-  );
-
-  const relevantSubjectIds = new Set(
-    programSections.flatMap((s: any) => s.subjectIds)
-  );
-
-  // Aligned with faculty_v2 (personal and preferences JSONB)
-  const facultyBlock = c.professors.map(p => {
-    const usedUnits = _currentSched
-      .filter(s => s.faculty_id === p.id && s.day !== "TBD")
-      .filter((s, _, arr) => {
-        if (!s.session_group_id) return true;
-        return arr.findIndex(x => x.session_group_id === s.session_group_id) === arr.indexOf(s);
-      })
-      .reduce((n, s) => n + (SUBJECT_LIST.find(x => x.id === s.subject_id)?.units ?? 0), 0);
-    const rem = p.maxUnits - usedUnits;
-    const teaches = p.subjectSpecializations.length ? p.subjectSpecializations.join(",") : "ANY";
-    const noDay = p.unavailableDays.join(",") || "none";
-    const noSlot = p.unavailableTimeSlots.join(",") || "none";
-    const prefDays = p.preferredDays.length < c.days.length
-      ? `|pref:[${p.preferredDays.join(",")}]` : "";
-    return `${p.id}|${p.name}|${p.employmentType[0]}T|${rem}u/${p.maxUnits}u` +
-      `|teaches:[${teaches}]|noDay:[${noDay}]|noSlot:[${noSlot}]${prefDays}` +
-      `|maxDay:${p.maxClassesPerDay}|maxH:${p.maxConsecutiveHours}`;
-  }).join("\n");
-
-  // Aligned with rooms_v2 table
-  const roomBlock = c.rooms.map(r =>
-    `${r.id}|${r.name}|${r.type}`
-  ).join("\n");
-
-  // Aligned with subjects_v2 table (subject_code, year_level, facility_type)
-  const subjectBlock = c.subjects
-    .filter(s => relevantSubjectIds.has(s.id))
-    .map(s => {
-      const splitStr = s.canSplit ? (s.splitPattern?.join("+") ?? "?") + "h" : "nosplit";
-      const manualFlag = s.assignmentMode === "manual" ? "|manual" : "";
-      return `${s.id}|${s.units}u|${s.facilityType}|${splitStr}${manualFlag}`;
-    }).join("\n");
-
-  const hardRules =
-    `1.No faculty/room double-book 2.FT≤21u PT≤12u\n` +
-    `3.Faculty teaches only their teaches:[] subjects (ANY=unrestricted)\n` +
-    `4.Lab subject→lab room, lecture→lecture room\n` +
-    `5.Respect noDay/noSlot/maxDay/maxH per faculty\n` +
-    `6.SPLIT: 2 entries, same session_group_id, different days, hours sum=units\n` +
-    `7.LAB-LEC PAIRING (CRITICAL): If a section has both a Lab and Lecture variant of the same subject (e.g. "Web Dev Lab" + "Web Dev Lec" for same section), BOTH must be assigned to the SAME faculty member. Check subject codes — strip "Lab"/"Lec" suffix to find pairs. Same professor = full 3-unit credit.\n` +
-    `8.LAB HOURS EXCEPTION: Lab subjects (facilityType=lab) are 1 credit unit but MUST be scheduled for 2 clock hours. Set end_time = start_time + 2 hrs for all lab subjects, not 1 hr. Lab sessions may be split across two time blocks on different days if needed.\n` +
-    `9.NSTP SUNDAY (CRITICAL): Any subject whose code contains "NSTP" MUST be scheduled on Sunday — no other day is acceptable.`;
-
-  // Aligned with curriculum_v2 requirements
-  let entryNum = 0;
-  const requirementLines: string[] = [];
-  programSections.forEach((sec: any) => {
-    sec.subjectIds.forEach((subId: string) => {
-      entryNum++;
-      const sub = c.subjects.find(s => s.id === subId);
-      requirementLines.push(
-        `${entryNum}. section="${sec.label}" subject_id="${subId}"` +
-        ` (${sub?.code ?? subId}, ${sub?.units ?? "?"}u, ${sub?.assignmentMode ?? "auto"})`
-      );
-    });
-  });
-
-  let totalEntries = 0;
-
-  const curriculumBlock = programSections.map((sec: any) => {
-    if (sec.subjectIds.length === 0) return null;
-    totalEntries += sec.subjectIds.length;
-    return `${sec.label}|needs:[${sec.subjectIds.join(",")}]`;
-  }).filter(Boolean).join("\n");
-
-  return `
-  Schedule ${programName} ONLY. Output exactly ${totalEntries} entries — one per subject per section.
-
-  FACULTY (id|name|type|rem/max|teaches|noDay|noSlot|maxDay|maxH):
-  ${facultyBlock}
-
-  ROOMS (id|name|type):
-  ${roomBlock}
-
-  SUBJECTS (id|units|facilityType|split|manual?):
-  ${subjectBlock}
-
-  DAYS: ${c.days.join(",")} (NOTE: NSTP subjects must use Sunday)
-  HOURS: 07:00,08:00,09:00,10:00,11:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00
-  start_time = when class begins. end_time = start + subject units (e.g. 3u subject at 07:00 → start_time:"07:00" end_time:"10:00"). 
-  EXCEPTION: lab subjects always end_time = start_time + 2hrs regardless of unit count.
-
-  RULES:
-  ${hardRules}
-
-  SECTIONS:
-  ${curriculumBlock}
-
-  IDs: Use bare IDs exactly as shown. No prefixes. No invented IDs.
-
-  REQUIRED SCHEMA ENFORCEMENT: 
-  You MUST provide a valid day from the DAYS list and a valid time from the HOURS list for EVERY entry. 
-  If you cannot find a valid slot without breaking a rule, YOU MUST DELIBERATELY CREATE A CONFLICT. 
-  If stuck, forcefully assign "day": "Monday" and "start_time": "07:00". 
-  Leaving a field blank or outputting "" is a catastrophic failure. The Local Validator will catch the conflict later.
-  
-  - CRITICAL RULE: For subjects marked with '|manual' (e.g. GE, MATH, PE, NSTP), you MUST schedule the day, room, and time normally, but you MUST set "faculty_id": "TBD". Do NOT assign a real faculty to them!
-
-  OUTPUT JSON only:
-  {"schedule":[{"faculty_id":"<id>","subject_id":"<id>","room_id":"<id>","day":"Monday","start_time":"07:00","end_time":"10:00","section":"${programName} 1-A"}],"reasoning":"<2 sentences>","conflicts_resolved":[]}
-  Omit session_group_id/session_hours for non-split entries.
-  `.trim();
-}
 // ─────────────────────────────────────────────────────────────────────────────
 // FACULTY UTILIZATION BUILDER
 // Computes per-faculty unit usage, subject list, and reason for non-utilization.
@@ -1422,7 +594,7 @@ function buildProgramPrompt(
 function buildFacultyUtilization(sched: ScheduleAssignment[]): FacultyUtilization[] {
   return FACULTY_LIST.map(f => {
     const prefs   = getPrefs(f.id);
-    const maxUnits = f.personal.employmentType === "Part-time" ? 12 : 21;
+    const maxUnits = f.personal.employmentType === "Part-Time" ? 12 : 21;
 
     const myEntries = sched.filter(s => s.faculty_id === f.id)
       .filter((s, _, arr) => {
@@ -1466,93 +638,7 @@ function buildFacultyUtilization(sched: ScheduleAssignment[]): FacultyUtilizatio
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MINIMUM LOAD ENFORCER
-// After Gemini generates the draft, scan for faculty with 0 assignments.
-// For each one, find a subject in the curriculum that matches their
-// specialization and create a "TBD-time" placeholder entry the admin can
-// complete. This runs locally — no extra API call.
-// ─────────────────────────────────────────────────────────────────────────────
 
-function enforceMinimumLoad(
-  draft: ScheduleAssignment[],
-  constraints: ReturnType<typeof buildConstraints>
-): ScheduleAssignment[] {
-  const extra: ScheduleAssignment[] = [];
-  const MIN_UNITS = 3; // Each unassigned faculty should receive at least one 3-unit subject
-  // Find any subject in the semester's curriculum that this faculty can teach
-  // and that isn't already fully covered (i.e., still has sections needing a teacher)
-  const alreadyAssigned = new Set(draft.map(s => `${s.subject_id}|${s.section}`));
-
-  constraints.professors.forEach(prof => {
-    // Skip part-time faculty with very limited capacity
-    const currentUnits = draft
-      .filter(s => s.faculty_id === prof.id)
-      .filter((s, _, arr) => {
-        if (!s.session_group_id) return true;
-        return arr.findIndex(x => x.session_group_id === s.session_group_id) === arr.indexOf(s);
-      })
-      .reduce((n, s) => n + (SUBJECT_LIST.find(x => x.id === s.subject_id)?.units ?? 0), 0);
-
-    if (currentUnits > 0) return; // already has load — skip
-    if (prof.maxUnits < MIN_UNITS) return; // too little capacity to add anything
-
-    const hasAnyCoverableGap = (constraints as any).sections.some((sec: any) =>
-      sec.subjectIds.some((subId: string) => {
-        const key = `${subId}|${sec.label}`;
-        // SAFEGUARD: Don't use manual subjects to enforce minimum load
-        const subCheck = SUBJECT_LIST.find(x => x.id === subId);
-        if (subCheck && subCheck.assignmentMode === "manual") return false;
-        
-        return !alreadyAssigned.has(key) && (prof.subjectSpecializations.length === 0 || prof.subjectSpecializations.includes(subId));
-      })
-    );
-    if (!hasAnyCoverableGap) return;
-
-    let found = false;
-    for (const sec of (constraints as any).sections) {
-      if (found) break;
-      for (const subId of sec.subjectIds) {
-        if (found) break;
-        const key = `${subId}|${sec.label}`;
-        if (alreadyAssigned.has(key)) continue;
-        if (prof.subjectSpecializations.length > 0 && !prof.subjectSpecializations.includes(subId)) continue;
-
-        const sub = SUBJECT_LIST.find(x => x.id === subId);
-        if (!sub || sub.assignmentMode === "manual") continue; // SAFEGUARD
-
-        // Find a suitable room
-        const neededType = (sub as any).facilityType ?? "lecture";
-        const room = (ROOM_LIST as any[]).find((r: any) => r.type === neededType);
-        if (!room) continue;
-
-        // Create a placeholder — day/time are "TBD" so the admin schedules it
-        // The status is "draft" and the special day value "TBD" signals the UI
-        extra.push({
-          id:         `min-load-${prof.id}-${subId}-${Date.now()}`,
-          faculty_id: prof.id,
-          subject_id: subId,
-          room_id:    room.id,
-          day:        "TBD",
-          start_time: "TBD",
-          end_time:   "TBD",
-          section:    sec.label,
-          status:     "draft" as const,
-        });
-
-        alreadyAssigned.add(key);
-        found = true;
-        console.log(`[DeptFlow] enforceMinimumLoad: assigned ${sub.code} to ${prof.name} (was at 0 units). Time TBD.`);
-      }
-    }
-
-    if (!found) {
-      console.log(`[DeptFlow] enforceMinimumLoad: ${prof.name} has no matching subject available — left unassigned.`);
-    }
-  });
-
-  return [...draft, ...extra];
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CURRICULUM COMPLETENESS CHECKER
@@ -1569,155 +655,6 @@ export interface MissingEntry {
   program:   string;
 }
  
-function checkCurriculumCompleteness(
-  sched: ScheduleAssignment[],
-  constraints: ReturnType<typeof buildConstraints>
-): { missing: MissingEntry[]; issues: ValidationIssue[] } {
-  const missing: MissingEntry[] = [];
-  const issues:  ValidationIssue[] = [];
- 
-  // 1. Build a set of "Aggressively Normalized" keys from the schedule
-  // We remove ALL spaces and force uppercase to ensure a perfect match.
-  const covered = new Set(
-    sched.map(s => {
-      const sub = SUBJECT_LIST.find(x => x.id === s.subject_id);
-      // We prioritize matching by CODE (e.g., "CS101") because that's what the UI shows
-      const subjectKey = (sub?.code ?? s.subject_id).replace(/\s+/g, "").toUpperCase();
-      const sectionKey = s.section.replace(/\s+/g, "").toUpperCase();
-      return `${sectionKey}|${subjectKey}`;
-    })
-  );
- 
-  for (const sec of (constraints as any).sections) {
-    const sectionKey = sec.label.replace(/\s+/g, "").toUpperCase();
-    
-    for (const subId of sec.subjectIds) {
-      const sub = SUBJECT_LIST.find(x => x.id === subId);
-      // 2. Normalize the curriculum requirement using the exact same logic
-      const subjectKey = (sub?.code ?? subId).replace(/\s+/g, "").toUpperCase();
-      
-      const key = `${sectionKey}|${subjectKey}`;
-      
-      if (!covered.has(key)) {
-        missing.push({
-          section:     sec.label,
-          subjectId:   subId,
-          subjectCode: sub?.code ?? subId,
-          program:     sec.program,
-        });
-        issues.push({
-          id:      `missing-${sec.label.replace(/\s/g, "_")}-${subId}`,
-          type:    "HARD",
-          label:   "Missing Schedule Entry",
-          message: `${sub?.code ?? subId} is required for ${sec.label} but has no schedule entry.`,
-        });
-      }
-    }
-  }
- 
-  return { missing, issues };
-}
- 
-// ─────────────────────────────────────────────────────────────────────────────
-// LOAD REDISTRIBUTION
-// After Gemini generates, detect cases where the same faculty was assigned
-// the same subject for MULTIPLE sections (e.g., CS 101 for both 1-A and 1-B).
-// For each excess entry, find a different qualified faculty with remaining
-// capacity and reassign it locally — no extra API call.
-// ─────────────────────────────────────────────────────────────────────────────
- 
-function redistributeConcentratedLoad(
-  draft: ScheduleAssignment[],
-  constraints: ReturnType<typeof buildConstraints>
-): ScheduleAssignment[] {
-  const result = [...draft];
- 
-  // Group entries by subject_id → count per faculty
-  const subjectFacultyMap: Record<string, Record<string, string[]>> = {};
-  // subjectFacultyMap[subjectId][facultyId] = [entryId, entryId, ...]
-  result.forEach(s => {
-    if (s.faculty_id === "TBD" || s.day === "TBD") return;
-    if (!subjectFacultyMap[s.subject_id]) subjectFacultyMap[s.subject_id] = {};
-    if (!subjectFacultyMap[s.subject_id][s.faculty_id]) subjectFacultyMap[s.subject_id][s.faculty_id] = [];
-    subjectFacultyMap[s.subject_id][s.faculty_id].push(s.id);
-  });
- 
-  let reassignCount = 0;
- 
-  Object.entries(subjectFacultyMap).forEach(([subjectId, facultyGroups]) => {
-    Object.entries(facultyGroups).forEach(([facultyId, entryIds]) => {
-      // If this faculty has MORE than 1 entry for this subject across sections,
-      // keep the first and try to move the rest to other qualified faculty.
-      if (entryIds.length <= 1) return;
- 
-      const sub      = SUBJECT_LIST.find(x => x.id === subjectId);
-      const subUnits = sub?.units ?? 0;
- 
-      const excessIds = entryIds.slice(1); // keep the first, redistribute the rest
-      excessIds.forEach(entryId => {
-        const entryIndex = result.findIndex(s => s.id === entryId);
-        if (entryIndex === -1) return;
- 
-        // Find a different qualified faculty with remaining capacity
-        const candidate = constraints.professors
-          .filter(p => {
-            if (p.id === facultyId) return false;
-            if (!p.subjectSpecializations.includes(subjectId)) return false;if (p.subjectSpecializations.length > 0 && !p.subjectSpecializations.includes(subjectId)) return false;// Don't assign the same subject to someone already teaching it
-            const alreadyTeachesSubject = result.some(
-              s => s.faculty_id === p.id && s.subject_id === subjectId && s.day !== "TBD"
-            );
-            if (alreadyTeachesSubject) return false;
-            const used = result
-              .filter(s => s.faculty_id === p.id && s.day !== "TBD")
-              .filter((s, _, arr) => {
-                if (!s.session_group_id) return true;
-                return arr.findIndex(x => x.session_group_id === s.session_group_id) === arr.indexOf(s);
-              })
-              .reduce((n, s) => n + (SUBJECT_LIST.find(x => x.id === s.subject_id)?.units ?? 0), 0);
-            return used + subUnits <= p.maxUnits;
-          })
-          .sort((a, b) => {
-            // Prefer most remaining capacity
-            const usedA = result
-              .filter(s => s.faculty_id === a.id && s.day !== "TBD")
-              .reduce((n, s) => n + (SUBJECT_LIST.find(x => x.id === s.subject_id)?.units ?? 0), 0);
-            const usedB = result
-              .filter(s => s.faculty_id === b.id && s.day !== "TBD")
-              .reduce((n, s) => n + (SUBJECT_LIST.find(x => x.id === s.subject_id)?.units ?? 0), 0);
-            return (a.maxUnits - usedA) - (b.maxUnits - usedB);
-          })[0];
- 
-        if (candidate) {
-          const oldFacultyName = FACULTY_LIST.find(f => f.id === facultyId)
-            ? `${FACULTY_LIST.find(f => f.id === facultyId)!.personal.firstName} ${FACULTY_LIST.find(f => f.id === facultyId)!.personal.lastName}`
-            : facultyId;
-          const newFacultyName = FACULTY_LIST.find(f => f.id === candidate.id)
-            ? `${FACULTY_LIST.find(f => f.id === candidate.id)!.personal.firstName} ${FACULTY_LIST.find(f => f.id === candidate.id)!.personal.lastName}`
-            : candidate.id;
-          console.log(
-            `[DeptFlow] redistributeConcentratedLoad: ${sub?.code ?? subjectId} ` +
-            `(${result[entryIndex].section}) moved from ${oldFacultyName} → ${newFacultyName}`
-          );
-          result[entryIndex] = { ...result[entryIndex], faculty_id: candidate.id };
-          // Update the facultyGroups map so later iterations see the new assignment
-          subjectFacultyMap[subjectId][candidate.id] = [
-            ...(subjectFacultyMap[subjectId][candidate.id] ?? []),
-            entryId,
-          ];
-          reassignCount++;
-        }
-      });
-    });
-  });
- 
-  if (reassignCount > 0) {
-    console.log(`[DeptFlow] redistributeConcentratedLoad: ${reassignCount} entries redistributed for even load.`);
-  } else {
-    console.log("[DeptFlow] redistributeConcentratedLoad: Load already well-distributed.");
-  }
- 
-  return result;
-}
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN EXPORT — generateSchedule()
 // Runs one Gemini call per program IN PARALLEL via Promise.all().
@@ -1727,13 +664,18 @@ function redistributeConcentratedLoad(
 export interface GenerateScheduleOptions {
   /** Which semester to generate (1 = 1st sem, 2 = 2nd sem). Defaults to 1. */
   sem?: 1 | 2;
+  schoolYear?: number;
 }
  
 export async function generateSchedule(
   options: GenerateScheduleOptions = {}
 ): Promise<GenerationResult> {
-  console.log("[DeptFlow] Fetching latest data from database...");
+  console.log("[DeptFlow] Starting Deterministic Generation Engine...");
 
+  // 🚩 We extract the variables right at the start to stamp them later!
+  const { sem = 1, schoolYear } = options; 
+
+  // 1. Fetch Data (Keep your existing API calls)
   const [facRes, subRes, roomRes, currRes] = await Promise.all([
     api.get("/manage-schedule/faculty"),
     api.get("/manage-schedule/subjects"),
@@ -1741,296 +683,247 @@ export async function generateSchedule(
     api.get("/manage-schedule/curriculums"),
   ]);
 
-  const rawFac  = facRes.data;
-  const rawSub  = subRes.data;
-  const rawRoom = roomRes.data;
-  const rawCurr = currRes.data;
+  const rawFac  = facRes.data || facRes;
+  const rawSub  = subRes.data || subRes;
+  const rawRoom = roomRes.data || roomRes;
+  const rawCurr = currRes.data || currRes;
 
-  // Helper to unwrap API responses
-  const unwrapArray = (response: any): any[] => {
-    if (Array.isArray(response)) return response;
-    if (response?.data     && Array.isArray(response.data))     return response.data;
-    if (response?.rooms    && Array.isArray(response.rooms))    return response.rooms;
-    if (response?.faculty  && Array.isArray(response.faculty))  return response.faculty;
-    if (response?.subjects && Array.isArray(response.subjects)) return response.subjects;
-    console.warn("[DeptFlow] Unexpected API response format:", response);
-    return [];
-  };
-
-  const facArray = unwrapArray(rawFac);
-  const subArray = unwrapArray(rawSub);
-  const roomArray = unwrapArray(rawRoom);
-  const currArray = unwrapArray(rawCurr);
-
-  // 1. FACULTY_LIST Mapping (Handles JSONB fields)
-FACULTY_LIST = facArray.filter((f: any) => {
-  const status = f.personal
-    ? (typeof f.personal === 'string' ? JSON.parse(f.personal) : f.personal)?.status
-    : f.status;
-  return status === "Active" || !status; // include if no status field
-}).map((f: any) => {
-  const personal = f.personal
-    ? (typeof f.personal === 'string' ? JSON.parse(f.personal) : f.personal)
-    : null;
-  const prefs = f.preferences
-    ? (typeof f.preferences === 'string' ? JSON.parse(f.preferences) : f.preferences)
-    : null;
-
-  return {
-    id: f.id || f.faculty_id,  // ✅ handles faculty_id column
-    personal: {
-      firstName:      personal?.firstName      ?? f.first_name,
-      lastName:       personal?.lastName       ?? f.last_name,
-      employmentType: personal?.employmentType ?? f.employment_type ?? "Full-time",
-      status:         personal?.status         ?? f.status          ?? "Active",
-    },
-    preferences: prefs ?? {
-      subjectSpecializations: subArray.map((s: any) => s.subject_code ?? s.code),
-      unavailableDays:        [],
-      preferredDays:          ["Monday","Tuesday","Wednesday","Thursday","Friday"],
-      unavailableTimeSlots:   [],
-      preferredTimeRange:     { start: "07:00", end: "18:00" },
-      preferredRoomTypes:     ["lab","lecture"],
-      priority:               "medium",
-      maxClassesPerDay:       3,
-      maxConsecutiveHours:    4,
-    }
-  };
-});
-
-  // 2. SUBJECT_LIST Mapping (Matches V2 Column Names)
-  SUBJECT_LIST = subArray.map((s: any) => {
-    const code = (s.subject_code ?? s.code ?? "").trim();
-    const codeUpper = code.toUpperCase();
-
-    let mode = s.assignment_mode ?? s.assignmentMode ?? "auto";
-
-    // ENFORCE CORE SUBJECTS (AI Scheduled)
-    if (codeUpper.includes("CS") || codeUpper.includes("IT") || codeUpper.includes("IS") || codeUpper.includes("CC") || codeUpper.includes("COSC")) {
-      mode = "auto";
-    }
-    // EXCLUDE EXTERNAL SUBJECTS (Manually Scheduled)
-    else if (codeUpper.includes("GE") || codeUpper.includes("MATH") || codeUpper.includes("NSTP") || codeUpper.includes("PE")) {
-      mode = "manual";
-    }
+  // 2. Map Faculty & Rooms (Keep your existing mapping logic here)
+  FACULTY_LIST = rawFac.filter((f: any) => {
+    const status = f.personal
+      ? (typeof f.personal === 'string' ? JSON.parse(f.personal) : f.personal)?.status
+      : f.status;
+    return status === "Active" || !status; 
+  }).map((f: any) => {
+    const personal = f.personal
+      ? (typeof f.personal === 'string' ? JSON.parse(f.personal) : f.personal)
+      : null;
+    const prefs = f.preferences
+      ? (typeof f.preferences === 'string' ? JSON.parse(f.preferences) : f.preferences)
+      : null;
 
     return {
-      id:             code,
-      code:           code,
-      name:           s.subject_name  ?? s.name,
-      units:          s.units ?? 0,
-      yearLevel:      s.year_level    ?? s.yearLevel,
-      semester:       s.semester,
-      programs:       s.programs      ?? [],
-      facilityType:   s.facility_type ?? s.facilityType   ?? "lecture",
-      assignmentMode: mode, 
-      canSplit:       s.can_split     ?? s.canSplit        ?? false,
-      splitPattern:   s.split_pattern ?? s.splitPattern   ?? null,
+      id: f.id || f.faculty_id,  
+      personal: {
+        firstName:      personal?.firstName      ?? f.first_name,
+        lastName:       personal?.lastName       ?? f.last_name,
+        employmentType: personal?.employmentType ?? f.employment_type ?? "Full-time",
+        status:         personal?.status         ?? f.status          ?? "Active",
+      },
+      preferences: prefs ?? {
+        subjectSpecializations: rawSub.map((s: any) => s.subject_code ?? s.code),
+        unavailableDays:        [],
+        preferredDays:          ["Monday","Tuesday","Wednesday","Thursday","Friday"],
+        unavailableTimeSlots:   [],
+        preferredTimeRange:     { start: "07:00", end: "18:00" },
+        preferredRoomTypes:     ["lab","lecture"],
+        priority:               "medium",
+        maxClassesPerDay:       3,
+        maxConsecutiveHours:    4,
+      }
     };
   });
 
-  // 3. ROOM_LIST Mapping (Matches V2 Column Names)
-  ROOM_LIST = roomArray.map((r: any) => ({
+  ROOM_LIST = rawRoom.map((r: any) => ({
     id:       r.id,
-    room:     r.room, // Matches 'room' column in rooms_v2
+    room:     r.room, 
     type:     r.type,
     capacity: r.capacity ?? 40,
-  }));
+  }));   // (Keep your detailed mapping from earlier)
 
-  // 4. CURRICULUM Mapping (Parses JSONB sections)
-  CURRICULUM = currArray.map((c: any) => ({
-    ...c,
-    // CRITICAL: curriculum_v2 stores sections as JSONB
-    sections: typeof c.sections === 'string' ? JSON.parse(c.sections) : (c.sections || [])
-  }));
+  // 3. Smart Subject Classifier (Crucial for routing)
+  SUBJECT_LIST = rawSub.map((s: any) => {
+    const code = (s.subject_code ?? s.code ?? "").trim().toUpperCase();
 
-  const { sem = 1 } = options;
-  const constraints = buildConstraints(sem);
- 
-  // Reference unused helper to satisfy strict noUnusedLocals checks
-  buildGenerationPrompt(constraints);
+    let category: "CORE" | "EXTERNAL" | "OJT" = "CORE";
+    if (code === "CS403-M" || code === "IS406-M" || code === "IT406-M") {
+      category = "OJT";
+    } else if (code.startsWith("GE") || code.startsWith("MATHA") || code.includes("NSTP") || code.startsWith("PE")) {
+      category = "EXTERNAL";
+    }
 
-  const programs    = ["BSCS", "BSIT", "BSIS"];
- 
-  // ── CALL 1 (parallel): Generate each program simultaneously ───────────────
-  console.log(`[DeptFlow] Generating schedules for ${programs.join(", ")} in parallel...`);
-  const t0 = Date.now();
+    return {
+      id: code,
+      code: code,
+      name: s.subject_name ?? s.name,
+      units: s.units ?? 0,
+      facilityType: s.facility_type ?? "lecture",
+      category: category, 
+    };
+  });
 
-  const checkpoint = loadCheckpoint(sem);
-  const programResults: GeminiScheduleResponse[] = [];
-  const accumulatedSched: ScheduleAssignment[] = [];
+  // 4. Curriculum Mapping
+  CURRICULUM = rawCurr.map((c: any) => {
+    const sections = c.curriculum_sections || [];
+    const subjects = c.curriculum_term_subjects || [];
+    return {
+      program: c.program,
+      sections: sections.map((sec: any) => {
+        const requiredSubjects = subjects.filter((sub: any) => sub.year_level === sec.year_level && sub.semester === sem);
+        return {
+          label: `${c.program} ${sec.year_level}-${sec.section}`, 
+          yearLevel: sec.year_level,
+          subjectIds: requiredSubjects.flatMap((sub: any) => {
+            if (Array.isArray(sub.subject_codes)) return sub.subject_codes;
+            if (typeof sub.subject_codes === 'string') { try { return JSON.parse(sub.subject_codes); } catch { return []; } }
+            if (sub.subject_code) return [sub.subject_code];
+            return [];
+          })
+        };
+      })
+    };
+  });
 
-  for (const prog of programs) {
-    if (checkpoint[prog]) {
-      console.log(`[DeptFlow] ↩ Restoring ${prog} from checkpoint (${checkpoint[prog].schedule.length} entries)`);
-      const converted = toScheduleAssignments(checkpoint[prog].schedule);
-      accumulatedSched.push(...converted);
-      programResults.push(checkpoint[prog]);
+  // ============================================================================
+  // THE DETERMINISTIC LOOP
+  // ============================================================================
+  const draftSchedule: ScheduleAssignment[] = [];
+  let idCounter = 0;
+
+  const facultyLoadTracker: Record<string, number> = {};
+  FACULTY_LIST.forEach((f: any) => {
+    facultyLoadTracker[f.id] = 0; // Everyone starts at 0 units
+  });
+
+  // Helper to safely stamp our data
+  const createEntry = (data: Partial<ScheduleAssignment>): ScheduleAssignment => ({
+    schedule_id: `gen-${Date.now()}-${idCounter++}`,
+    faculty_id: data.faculty_id || "TBD",
+    subject_id: data.subject_id || "",
+    room_id: data.room_id || "TBD",
+    day: data.day || "TBD",
+    start_time: data.start_time || "TBD",
+    end_time: data.end_time || "TBD",
+    section: data.section || "",
+    status: "draft",
+    semester: sem,                     // 🚩 STAMPED PERFECTLY!
+    school_year: schoolYear || null,   // 🚩 STAMPED PERFECTLY!
+    ...data
+  });
+
+  const allSections: { label: string, yearLevel: number, subjectIds: string[] }[] = [];
+  for (const prog of CURRICULUM) {
+    for (const sec of prog.sections) {
+      allSections.push(sec);
     }
   }
 
-  const remainingPrograms = programs.filter(p => !checkpoint[p]);
+  allSections.sort((a, b) => (Number(a.yearLevel) || 99) - (Number(b.yearLevel) || 99));
 
-  for (const prog of remainingPrograms) {
-    console.log(`[DeptFlow] → Generating ${prog}...`);
-    const result = await callGemini(buildProgramPrompt(constraints, prog, accumulatedSched));
-    console.log(`[DeptFlow] ✓ ${prog} done (${result.schedule.length} entries)`);
+  // Find the Dept Head for OJT
+  const deptHead = FACULTY_LIST.find((f: any) => f.personal?.designation?.toLowerCase().includes("head"));
 
-  // Save immediately after each program completes
-  saveCheckpoint(sem, prog, result);
+  // Loop through every program -> section -> subject
 
-  const converted = toScheduleAssignments(result.schedule);
-  accumulatedSched.push(...converted);
-  programResults.push(result);
-  }
+    for (const sec of allSections) {
+      for (const subId of sec.subjectIds) {
+        const subject = SUBJECT_LIST.find((s: any) => s.id === subId);
+        if (!subject) continue;
 
-  console.log(`[DeptFlow] All programs generated in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
- 
-  // Merge all program schedules into one flat array
-  const rawDraft = [...accumulatedSched];
- 
-  // ── MINIMUM LOAD ENFORCEMENT (local, free) ────────────────────────────────
-  // Adds TBD-time placeholder entries for any faculty with 0 assignments.
-  const afterMinLoad = enforceMinimumLoad(rawDraft, constraints);
-  console.log(`[DeptFlow] After enforceMinimumLoad: ${afterMinLoad.length} total entries (${rawDraft.length} from Gemini + ${afterMinLoad.length - rawDraft.length} placeholders).`);
- 
-  // ── LOAD REDISTRIBUTION (local, free) ────────────────────────────────────
-  // Detects and fixes cases where Gemini assigned the same subject to the
-  // same faculty across multiple sections (e.g., CS 101 for 1-A AND 1-B).
-  // Reassigns excess entries to other qualified faculty with remaining capacity.
-  const draft = redistributeConcentratedLoad(afterMinLoad, constraints);
- 
-  // ── LOCAL VALIDATION (free, instant) ─────────────────────────────────────
-  console.log("[DeptFlow] Running local validation across merged schedule...");
-  const issues     = validateLocally(draft);
- 
-  // ── CURRICULUM COMPLETENESS CHECK ─────────────────────────────────────────
-  // Verifies every section×subject pair required by the curriculum has an entry.
-  // Missing entries become HARD issues — triggers the fix round automatically.
-  const { issues: completenessIssues } = checkCurriculumCompleteness(draft, constraints);
-  const allIssues  = [...issues, ...completenessIssues];
-  const hardIssues = allIssues.filter(i => i.type === "HARD");
-  console.log(`[DeptFlow] ${hardIssues.length} hard issue(s) (incl. ${completenessIssues.length} missing entries), ${allIssues.length - hardIssues.length} soft warning(s).`);
- 
-  // ── HAPPY PATH ────────────────────────────────────────────────────────────
-  if (hardIssues.length === 0) {
-    console.log("[DeptFlow] No hard issues — accepted.");
-    const perProgramReasoning: Record<string, string> = {};
-    programs.forEach((p, i) => { perProgramReasoning[p] = programResults[i].reasoning; });
-    clearCheckpoint();
-    return {
-      schedule:            draft,
-      reasoning:           programResults.map((r, i) => `${programs[i]}: ${r.reasoning}`).join("\n"),
-      perProgramReasoning,
-      apiCallsUsed:        1,
-      conflictsResolved:   [],
-      wasFixed:            false,
-      facultyUtilization:  buildFacultyUtilization(draft),
-      missingEntries:      [],
-    };
-  }
+        // --- RULE 1: OJT ROUTING ---
+        if (subject.category === "OJT") {
+          draftSchedule.push(createEntry({
+            subject_id: subject.id,
+            section: sec.label,
+            faculty_id: deptHead ? deptHead.id : "TBD", // Assign to Head
+            room_id: "TBD",    // No room needed
+            day: "TBD",        // No day needed
+            start_time: "TBD", // No time needed
+            end_time: "TBD"
+          }));
+          continue;
+        }
 
+        // --- RULE 2: EXTERNAL (GE/PE/NSTP) ROUTING ---
+        if (subject.category === "EXTERNAL") {
+          const units = subject.units || 3;
+          const targetDay = subject.code.includes("NSTP") ? "Sunday" : "Monday";
+          let hour = 7;
+          while (hour + units <= 19) {
+            const busy = draftSchedule.some(s => s.day === targetDay && s.section === sec.label && 
+                         overlaps(`${hour}:00`, `${hour+units}:00`, s.start_time, s.end_time));
+            if (!busy) break;
+            hour++;
+          }
+          draftSchedule.push(createEntry({ subject_id: subject.id, section: sec.label, day: targetDay,
+            start_time: `${String(hour).padStart(2, "0")}:00`, end_time: `${String(hour + units).padStart(2, "0")}:00` }));
+          continue;
+        }
 
-  const allTimeConflicts = hardIssues.every(i => 
-  i.id.startsWith("time-") || i.id.startsWith("room-")
-);
-const hasRealEntries = draft.filter(s => 
-  s.start_time !== "07:00" || s.end_time !== "08:00"
-).length > 0;
+        // --- RULE 3: CORE SUBJECTS ---
+        if (subject.category === "CORE") {
+          const totalUnits = subject.units || 3;
+          const needsSplit = totalUnits > 3 || subject.code.includes("MATHA");
+          const sessions = needsSplit ? [3, 2] : [totalUnits];
 
-if (allTimeConflicts && !hasRealEntries) {
-  console.warn("[DeptFlow] All hard issues are time conflicts from empty Gemini times. Returning draft — retry generation.");
-  clearCheckpoint(); // force fresh generation next time
-  return {
-    schedule:            draft,
-    reasoning:           "Times missing from AI response — schedule needs regeneration.",
-    perProgramReasoning: {},
-    apiCallsUsed:        1 as const,
-    conflictsResolved:   [],
-    wasFixed:            false,
-    facultyUtilization:  buildFacultyUtilization(draft),
-    missingEntries:      [],
-  };
-}
-  // ── CALL 2 (parallel): Fix conflicts per-program ──────────────────────────
-  // Group hard issues by which program's entries they affect
-  console.log("[DeptFlow] Fixing conflicts — grouping by program...");
+          const isLab = subject.facilityType === "lab";
 
-  const fixResults = await Promise.all(
-    programs.map(async (prog) => {
-      const progPrefix  = prog.toLowerCase();
-      const progEntries = draft.filter(s => s.section.toLowerCase().startsWith(progPrefix));
-      const progSections = new Set(progEntries.map(e => e.section));
-      const progIssues   = hardIssues.filter(issue =>
-        (issue.id.startsWith("missing-") && [...progSections].some(sec =>
-          issue.id.includes(sec.replace(/\s/g, "_"))
-        )) ||
-        progEntries.some(e =>
-          issue.id.includes(e.id) ||
-          (issue.message.includes(e.section) && progSections.has(e.section))
-        )
-      );
+          for (const sUnits of sessions) {
+            const clockHours = isLab ? sUnits * 2 : sUnits;
+            const getCourseBase = (code: string) => code.replace(/(1L|2L|1|2)(-[A-Z0-9]+)?$/i, "");
+            const myBase = getCourseBase(subject.code);
+            
+            const siblingEntry = draftSchedule.find(s =>
+              s.section === sec.label &&
+              s.faculty_id !== "TBD" &&
+              getCourseBase(s.subject_id.split("-")[0]) === myBase // Quick split to handle IDs properly
+            );
 
-      if (progIssues.length === 0) {
-        console.log(`[DeptFlow] ✓ ${prog} has no hard issues to fix`);
-        return { schedule: progEntries };
+            let facId = "TBD";
+
+            if (siblingEntry) {
+              // FORCE PAIRING: Bypass load balancing and use the sibling's professor!
+              facId = siblingEntry.faculty_id || "TBD";
+              if (facId !== "TBD") facultyLoadTracker[facId] += sUnits;
+            } else {
+              // Normal load-balanced assignment + Lowercase "Part-time" fix
+              let eligibleFac = FACULTY_LIST.filter(f => f.preferences?.subjectSpecializations?.includes(subject.id) && 
+                                (facultyLoadTracker[f.id] + sUnits) <= (String(f.personal.employmentType).toLowerCase().includes("part") ? 12 : 21))
+                                .sort((a,b) => facultyLoadTracker[a.id] - facultyLoadTracker[b.id]);
+
+              facId = eligibleFac[0]?.id || "TBD";
+              if (facId !== "TBD") facultyLoadTracker[facId] += sUnits; 
+            }
+
+            const rooms = ROOM_LIST.filter(r => r.type.toLowerCase() === subject.facilityType.toLowerCase());
+            let finalDay = "TBD", finalStart = 0, finalRoom = "TBD", found = false;
+
+            for (const d of DAYS) {
+              if (found) break;
+              if (draftSchedule.some(s => s.subject_id === subject.id && s.section === sec.label && s.day === d)) continue;
+
+              for (let h = 7; h + clockHours <= 19; h++) {
+                if (found) break;
+                if (draftSchedule.some(s => s.day === d && (s.section === sec.label || s.faculty_id === facId) && 
+                    overlaps(`${h}:00`, `${h+clockHours}:00`, s.start_time, s.end_time))) continue;
+
+                  for (const r of rooms) {
+                    if (!draftSchedule.some(s => s.day === d && s.room_id === r.id && 
+                        overlaps(`${h}:00`, `${h+clockHours}:00`, s.start_time, s.end_time))) {
+                      finalDay = d; finalStart = h; finalRoom = r.id; found = true; break;
+                  }
+                }
+              }
+            }
+           draftSchedule.push(createEntry({ 
+              subject_id: subject.id, section: sec.label, faculty_id: facId, 
+              room_id: finalRoom, day: finalDay, 
+              start_time: `${String(finalStart).padStart(2, "0")}:00`, 
+              end_time: `${String(finalStart + clockHours).padStart(2, "0")}:00`, 
+              session_hours: clockHours 
+            }));
+          }
+        }
       }
+    }
 
-      console.log(`[DeptFlow] → Fixing ${progIssues.length} issue(s) in ${prog}...`);
-      const fixed = await callGemini(buildFixPrompt(constraints, progEntries, progIssues, draft));
-      console.log(`[DeptFlow] ✓ ${prog} fixed`);
-      return fixed;
-    })
-  );
+  console.log(`[DeptFlow] Deterministic Engine created ${draftSchedule.length} entries.`);
 
-  const fixedItems = fixResults.flatMap(r =>
-    Array.isArray(r.schedule) ? r.schedule : []
-  );
-  const fixedRaw = toScheduleAssignments(fixedItems);
-  const fixed    = redistributeConcentratedLoad(fixedRaw, constraints);
-  const remaining = validateLocally(fixed).filter(r => r.type === "HARD");
-
-  if (remaining.length > 0) {
-    console.warn(`[DeptFlow] ${remaining.length} hard issue(s) remain. Admin review recommended.`);
-  } else {
-    console.log("[DeptFlow] All hard issues resolved.");
-  }
-
-  const perProgramReasoningFixed: Record<string, string> = {};
-  programs.forEach((p, i) => {
-    const r = fixResults[i] as any;
-    perProgramReasoningFixed[p] = r.reasoning ?? "Fixed.";
-  });
-
-  const { missing: missingAfterFix } = checkCurriculumCompleteness(
-    fixedRaw.length > 0 ? fixed : draft, constraints
-  );
-
-  // If fix round returned nothing useful, fall back to draft
-  if (fixedRaw.length === 0) {
-    console.warn("[DeptFlow] Fix round returned 0 entries. Falling back to draft.");
-    clearCheckpoint();
-    return {
-      schedule:            draft,
-      reasoning:           "Fix round failed — showing draft with issues for admin review.",
-      perProgramReasoning: perProgramReasoningFixed,
-      apiCallsUsed:        2 as const,
-      conflictsResolved:   [],
-      wasFixed:            true,
-      facultyUtilization:  buildFacultyUtilization(draft),
-      missingEntries:      missingAfterFix,
-    };
-  }
-
-  clearCheckpoint();
+  // Return the draft! (No AI calls needed yet)
   return {
-    schedule:            fixed,
-    reasoning:           "Schedule generated and fixed per program.",
-    perProgramReasoning: perProgramReasoningFixed,
-    apiCallsUsed:        2 as const,
-    conflictsResolved:   fixResults.flatMap(r => (r as any).conflicts_resolved ?? []),
-    wasFixed:            true,
-    facultyUtilization:  buildFacultyUtilization(fixed),
-    missingEntries:      missingAfterFix,
+    schedule: draftSchedule,
+    reasoning: "Deterministic baseline generated successfully.",
+    facultyUtilization: buildFacultyUtilization(draftSchedule), 
+    missingEntries: [] as MissingEntry[], // 🚩 FIX: explicitly cast the empty array
   };
 }
