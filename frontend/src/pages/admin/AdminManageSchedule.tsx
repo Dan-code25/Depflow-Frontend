@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 
 import { enrichConflictsWithGemini, type ValidationContext, validateFullScheduleAdherence } from "../../utils/geminiSchedule";
-import { generateSchedule, type FacultyUtilization, type MissingEntry, type ScheduleAssignment } from "../../utils/geminiSchedHelper";
+import { generateSchedule, type ScheduleAssignment } from "../../utils/geminiSchedHelper";
 
 // Import everything needed from our utility file
 import {
@@ -24,18 +24,12 @@ import {
   resolveConflictsDeterministically, isExternalSubject
 } from "../../utils/scheduleConflict";
 
+import placeholderImg from "../../assets/profile-placeholder.svg";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SMALL REUSABLE UI PRIMITIVES
 // ─────────────────────────────────────────────────────────────────────────────
 
-function Avatar({ initials, colorClass, size = "md" }: { initials:string; colorClass:string; size?:"sm"|"md"|"lg" }) {
-  const sz = size === "sm" ? "w-7 h-7 text-[11px]" : size === "lg" ? "w-11 h-11 text-base" : "w-9 h-9 text-sm";
-  return (
-    <div className={`${sz} ${colorClass} rounded-full flex items-center justify-center text-white font-bold shrink-0`}>
-      {initials}
-    </div>
-  );
-}
 
 function StatusBadge({ status }: { status: ScheduleStatus }) {
   if (status === "published")
@@ -272,6 +266,7 @@ function ScheduleFormModal({ editing, onSave, onClose, activeSem, curriculums, o
           >
             <option value="TBD">TBA / To Be Decided</option>
             {FACULTY_LIST.map(f=><option key={f.id} value={f.id}>{f.personal.firstName} {f.personal.lastName}</option>)}
+            {otherFacs?.map((f: any) => (<option key={f.id} value={f.id}>{f.faculty_name} (Custom Add)</option>))}
             <option value="OTHER" className="font-bold text-indigo-600">➕ Add Other Faculty...</option>
           </select>
           {displayFacId === "OTHER" && (
@@ -298,6 +293,7 @@ function ScheduleFormModal({ editing, onSave, onClose, activeSem, curriculums, o
           >
             <option value="TBD">TBA / To Be Decided</option>
             {ROOM_LIST.map(r=><option key={r.id} value={r.id}>{(r as any).room}</option>)}
+            {otherRooms?.map((r: any) => (<option key={r.id} value={r.id}>{r.room_name} (Custom Add)</option>))}
             <option value="OTHER" className="font-bold text-indigo-600">➕ Add Other Room...</option>
           </select>
           {displayRoomId === "OTHER" && (
@@ -573,66 +569,11 @@ function ConflictScanModal({ initialConflicts, onApplyFix, onApplyTransfers, onC
           className={`w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors ${canFinalize ? "bg-[#8B0000] text-white hover:bg-[#6B0000]" : "bg-gray-100 text-gray-500 cursor-not-allowed"}`}>
           <ShieldCheck size={16}/>
           {canFinalize 
-            ? "Finalize & Publish Schedule" 
+            ? "Finalize Schedule" 
             : overloadConflicts.length > 0
               ? `Resolve ${overloadConflicts.length} faculty overload(s) to continue`
               : `Run 'Auto-Fix Rooms' on the dashboard to resolve other conflicts`}
         </button>
-      </div>
-    </Modal>
-  );
-}
-
-function ReasoningModal({ data, onClose }: any) {
-  const semLabel = data.sem === 1 ? "1st Semester" : "2nd Semester";
-  const programs = ["BSCS", "BSIT", "BSIS"];
-  return (
-    <Modal title="AI Scheduling Reasoning" onClose={onClose} maxWidth="max-w-3xl">
-      <div className="flex items-center gap-2 mb-5 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
-        <CalendarDays size={15} className="text-indigo-500 shrink-0"/>
-        <span className="text-xs font-semibold text-indigo-700">{data.schoolYear} · {semLabel}</span>
-        <span className="ml-auto text-xs text-indigo-500">{data.apiCalls} API call{data.apiCalls!==1?"s":""} · {data.wasFixed ? "Generated + fixed" : "Generated clean"}</span>
-      </div>
-      <div className="space-y-3 mb-6">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">AI Reasoning per Program</p>
-        {programs.map(prog => {
-          const text = data.perProgram[prog]; if (!text) return null;
-          return (<div key={prog} className="p-3 bg-gray-50 border border-gray-100 rounded-xl"><p className="text-xs font-bold text-gray-700 mb-1">{prog}</p><p className="text-sm text-gray-600 leading-relaxed">{text}</p></div>);
-        })}
-      </div>
-      {data.missingEntries.length > 0 ? (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-          <div className="flex items-center gap-2 mb-3"><AlertTriangle size={15} className="text-red-600 shrink-0"/><p className="text-xs font-bold text-red-700 uppercase tracking-wider">Incomplete Schedule — {data.missingEntries.length} subject{data.missingEntries.length !== 1 ? "s" : ""} missing</p></div>
-          <p className="text-xs text-red-600 mb-3 leading-relaxed">The following subjects are required by the curriculum but have no schedule entry. Run <strong>Generate Schedule</strong> again or add them manually.</p>
-          <div className="space-y-1.5 max-h-48 overflow-y-auto">
-            {data.missingEntries.map((m: any, i: number) => (
-              <div key={i} className="flex items-center gap-3 bg-white border border-red-100 rounded-lg px-3 py-2"><span className="text-[10px] font-bold text-red-400 w-12 shrink-0">{m.program}</span><span className="text-xs font-bold text-red-800">{m.subjectCode}</span><span className="text-[11px] text-red-500 ml-auto">{m.section}</span></div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="mb-6 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl"><CheckCircle2 size={14} className="text-green-600 shrink-0"/><p className="text-xs font-semibold text-green-700">All curriculum subjects have schedule entries ✓</p></div>
-      )}
-      <div className="space-y-2">
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Faculty Utilization</p>
-        <div className="border border-gray-100 rounded-xl overflow-hidden">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-50 border-b border-gray-100"><tr><th className="text-left px-3 py-2 font-semibold text-gray-500">Faculty</th><th className="text-left px-3 py-2 font-semibold text-gray-500">Type</th><th className="text-left px-3 py-2 font-semibold text-gray-500">Units</th><th className="text-left px-3 py-2 font-semibold text-gray-500">Load</th><th className="text-left px-3 py-2 font-semibold text-gray-500">Subjects</th></tr></thead>
-            <tbody className="divide-y divide-gray-50">
-              {data.utilization.map((u: any) => {
-                const fData = FACULTY_LIST.find(f => f.id === u.facultyId); const empType = fData?.personal.employmentType ?? "";
-                const barColor = u.utilization >= 90 ? "bg-red-400" : u.utilization >= 70 ? "bg-amber-400" : u.utilization >= 30 ? "bg-green-400" : "bg-gray-200";
-                return (
-                  <tr key={u.facultyId} className={u.assignedUnits === 0 ? "bg-gray-50 opacity-60" : "bg-white"}>
-                    <td className="px-3 py-2 font-semibold text-gray-800">{u.name}</td><td className="px-3 py-2 text-gray-500">{empType}</td><td className="px-3 py-2 text-gray-700">{u.assignedUnits}/{u.maxUnits}u</td>
-                    <td className="px-3 py-2"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${barColor} rounded-full`} style={{width:`${Math.min(u.utilization,100)}%`}}/></div><span className="text-gray-500">{u.utilization}%</span></div></td>
-                    <td className="px-3 py-2 text-gray-500 max-w-[200px]">{u.assignedUnits === 0 && u.notUsedReason ? <span className="italic text-amber-600">{u.notUsedReason}</span> : u.subjects.join(", ") || "—"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
       </div>
     </Modal>
   );
@@ -730,7 +671,7 @@ function CardView({ data, otherFacs = [], otherRooms = [] , onEdit, onDelete }: 
         const guestRoomName = otherRooms.find((x : any) => x.id === s.other_room_id)?.name || "Guest Room";
         return (
           <div key={s.schedule_id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-lg transition-shadow">
-            <div className={`h-1.5 ${getAvatarColor(f)}`}/>
+            <div className={`h-1.5 bg-[#8B0000]`}/>
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 {isUnassigned ? (
@@ -741,7 +682,14 @@ function CardView({ data, otherFacs = [], otherRooms = [] , onEdit, onDelete }: 
                 ) : (
                   <div className="flex items-center gap-2.5">
                     {/* 👇 Update Avatar and Name to handle Guests */}
-                    <Avatar initials={isGuest ? guestFacName.substring(0, 2).toUpperCase() : getFacultyInitials(f)} colorClass={isGuest ? "bg-indigo-500" : getAvatarColor(f)} size="sm"/>
+                    <img 
+                      src={f?.photo_url || placeholderImg} 
+                      alt="Profile" 
+                      className="w-7 h-7 rounded-full object-cover border border-gray-200" 
+                      onError={(e) => { 
+                        e.currentTarget.src = placeholderImg; // If DB link breaks, swap to default
+                        e.currentTarget.onerror = null; // Prevents infinite loop if default asset is missing
+                      }} />
                     <div>
                       <p className="text-xs font-bold text-gray-900">{isGuest ? guestFacName : getFacultyName(f)}</p>
                       <p className="text-[11px] text-gray-400">{isGuest ? "External Professor" : f?.personal.designation}</p>
@@ -861,7 +809,13 @@ function LoadMonitorPanel({ sched }: { sched: ScheduleAssignment[] }) {
           return (
             <div key={f.id}>
               <div className="flex items-center gap-2 mb-1.5">
-                <Avatar initials={getFacultyInitials(f)} colorClass={getAvatarColor(f)} size="sm"/>
+                <img 
+                  src={f?.photo_url || placeholderImg}
+                  className="w-7 h-7 rounded-full object-cover border border-gray-200" 
+                  onError={(e) => { 
+                    e.currentTarget.src = placeholderImg;
+                    e.currentTarget.onerror = null; 
+                  }} />
                 <div className="flex-1 min-w-0"><p className="text-xs font-bold text-gray-900 truncate">{getFacultyName(f)}</p><p className="text-[10px] text-gray-400">{f.personal.employmentType}</p></div>
                 <span className={`text-sm font-black ${valColor}`}>{u}<span className="text-[10px] text-gray-400 font-normal">/{maxUnits}</span></span>
               </div>
@@ -878,9 +832,9 @@ function LoadMonitorPanel({ sched }: { sched: ScheduleAssignment[] }) {
 
 function ScheduleStatCard({ label, value, icon, sub }: { label:string; value:number; icon:React.ReactNode; sub?:string }) {
   return (
-    <div className="bg-white border-t-4 border-t-primary rounded-xl p-4 flex items-start gap-3 shadow-sm">
-      <div className="bg-[#FFF3F3] p-2.5 rounded-lg text-primary">{icon}</div>
-      <div><p className="text-xs font-bold text-gray-400 tracking-wider">{label}</p><p className="text-2xl font-black text-primary leading-tight">{value}</p>{sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}</div>
+    <div className="bg-white border-t-4 border-t-[#8B0000] rounded-xl p-4 flex items-start gap-3 shadow-sm">
+      <div className="bg-[#FFF3F3] p-2.5 rounded-lg text-[#8B0000]">{icon}</div>
+      <div><p className="text-xs font-bold text-gray-400 tracking-wider">{label}</p><p className="text-2xl font-black text-[#8B0000] leading-tight">{value}</p>{sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}</div>
     </div>
   );
 }
@@ -912,15 +866,6 @@ export default function ManageSchedule() {
 }, [schedules]);
   const [isDataLoaded,   setIsDataLoaded]   = useState(false); 
   const [activeSem, setActiveSem] = useState<{ schoolYear: string; sem: 1 | 2 }>({schoolYear: "2024-2025", sem: 1,});
-  const [lastReasoning,  setLastReasoning]  = useState<{
-    perProgram: Record<string, string>;
-    utilization: FacultyUtilization[];
-    missingEntries: MissingEntry[];
-    wasFixed: boolean;
-    apiCalls: number;
-    sem: 1 | 2;
-    schoolYear: string;
-  } | null>(null);
   const [curriculums, setCurriculums] = useState<any[]>([]);
   const [otherFacs, setOtherFacs] = useState<any[]>([]);
   const [otherRooms, setOtherRooms] = useState<any[]>([]);
@@ -977,7 +922,8 @@ export default function ManageSchedule() {
           return {
             id: f.id || f.faculty_id,
             personal: { firstName: personal?.firstName ?? f.first_name, lastName: personal?.lastName ?? f.last_name, employmentType: personal?.employmentType ?? f.employment_type ?? "Full-time", status: personal?.status ?? f.status ?? "Active" },
-            preferences: prefs
+            preferences: prefs,
+            photo_url: f.photo_url
           };
         }));
 
@@ -1091,9 +1037,9 @@ export default function ManageSchedule() {
     try {
       // 1. Initialize logic variables
       let finalFacId: string | null = entry.faculty_id;
-      let finalOtherFacId: string | null = null;
+      let finalOtherFacId: string | null = entry.other_faculty_id;
       let finalRoomId: string | null = entry.room_id;
-      let finalOtherRoomId: string | null = null;
+      let finalOtherRoomId: string | null = entry.other_room_id;
 
       const facultySafeRegex = /^[a-zA-Z\s.,'-]{2,50}$/;
       const roomSafeRegex = /^[a-zA-Z0-9\s-]{2,30}$/;
@@ -1139,6 +1085,15 @@ export default function ManageSchedule() {
         finalRoomId = null;
       }
 
+      if (finalFacId && otherFacs.some((f: any) => f.id === finalFacId || f.other_faculty_id === finalFacId)) {
+        finalOtherFacId = finalFacId;
+        finalFacId = null;
+      }
+      
+      if (finalRoomId && otherRooms.some((r: any) => r.id === finalRoomId || r.other_room_id === finalRoomId)) {
+        finalOtherRoomId = finalRoomId;
+        finalRoomId = null;
+      }
       // 5. BUILD PAYLOAD (Matches your updated DB Schema)
       const payload = {
         faculty_id:       finalFacId === "TBD" ? null : finalFacId,
@@ -1373,40 +1328,45 @@ export default function ManageSchedule() {
 
   return (
     <AdminLayout>
-    <div className="p-8 space-y-6 font-lexend">
+    <div className="p-0 space-y-6 font-lexend">
 
       {/* ── Page Header (Streamlined Top Bar) ── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="bg-white ounded-lg p-6 sm:p-8 mb-8 border border-slate-200 rounded-lg shadow-sm flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">   
         <div>
-          <h1 className="text-2xl font-black text-gray-900">Manage Schedule</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <div className="flex items-center gap-3 mb-2">
+            <CalendarDays size={32} className="text-burgundy"/>
+            <h1 className="text-2xl sm:text-3xl font-bold text-charcoal">
+               Manage Schedule
+            </h1>
+          </div>
+          <p className="text-slate-600 text-sm sm:text-base ml-11">
             Draft assignments or generate automatically. Resolve conflicts contextually.
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2 shrink-0">
+
+        <div className="w-full xl:w-auto flex flex-col items-end gap-3 shrink-0">
           {/* SEM/YEAR SELECTOR */}
-          <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-1.5">
-            <CalendarDays size={14} className="text-indigo-500 shrink-0"/>
-            <span className="text-xs font-semibold text-indigo-700 shrink-0">Generating for:</span>
-            <select className="text-xs font-bold text-indigo-800 bg-transparent border-none outline-none cursor-pointer" value={activeSem.schoolYear} onChange={e => setActiveSem(p => ({ ...p, schoolYear: e.target.value }))}>
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 w-full sm:w-auto justify-end">
+            <CalendarDays size={14} className="text-gray-500 shrink-0"/>
+            <span className="text-xs font-semibold text-gray-700 shrink-0">Generating for:</span>
+            <select className="text-xs font-bold text-gray-900 bg-transparent border-none outline-none cursor-pointer" value={activeSem.schoolYear} onChange={e => setActiveSem(p => ({ ...p, schoolYear: e.target.value }))}>
               {["2023-2024","2024-2025","2025-2026"].map(sy=>(<option key={sy} value={sy}>{sy}</option>))}
             </select>
-            <span className="text-indigo-400">·</span>
-            <select className="text-xs font-bold text-indigo-800 bg-transparent border-none outline-none cursor-pointer" value={activeSem.sem} onChange={e => setActiveSem(p => ({ ...p, sem: Number(e.target.value) as 1|2 }))}>
+            <span className="text-gray-300">·</span>
+            <select className="text-xs font-bold text-gray-900 bg-transparent border-none outline-none cursor-pointer" value={activeSem.sem} onChange={e => setActiveSem(p => ({ ...p, sem: Number(e.target.value) as 1|2 }))}>
               <option value={1}>1st Semester</option><option value={2}>2nd Semester</option>
             </select>
           </div>
 
-          <div className="flex gap-2 flex-wrap justify-end">
-
+          <div className="flex gap-2 flex-wrap justify-end w-full sm:w-auto">
             {/* NEW SETUP BUTTON */}
             <button 
               onClick={() => setModal("setup")} 
               disabled={hasExistingSections}
               title={hasExistingSections ? "Sections already exist for this term." : "Setup new sections"}
-              className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-bold shadow-sm transition-colors ${
+              className={`flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-bold shadow-sm transition-colors flex-1 sm:flex-none ${
                 hasExistingSections 
-                  ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed" 
+                  ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed" 
                   : "bg-white border-gray-200 hover:bg-gray-50 text-gray-700"
               }`}>
               <Users size={15}/> Setup Sections
@@ -1416,7 +1376,7 @@ export default function ManageSchedule() {
               onClick={handleGenerate}
               disabled={generating || scanning || hasExistingSchedules}
               title={hasExistingSchedules ? "Schedules already exist for this term. Please delete them to regenerate." : "Auto-generate schedule"}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all
+              className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex-1 sm:flex-none
                 ${generating || scanning || hasExistingSchedules
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"}`}
@@ -1425,13 +1385,13 @@ export default function ManageSchedule() {
               {generating ? "Generating..." : "Generate Schedule"}
             </button>
             
-            <button onClick={() => setModal("add")} className="flex items-center gap-2 px-4 py-2.5 bg-[#8B0000] hover:bg-[#6B0000] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#8B0000]/20 transition-colors">
+            <button onClick={() => setModal("add")} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#8B0000] hover:bg-[#6B0000] text-white rounded-xl text-sm font-bold shadow-lg shadow-[#8B0000]/20 transition-colors flex-1 sm:flex-none">
               <Plus size={15}/> Add Assignment
             </button>
           </div>
         </div>
       </div>
-
+      
       {/* ── Stat Cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <ScheduleStatCard label="TOTAL ASSIGNMENTS" value={schedules.length} icon={<BookOpen size={22}/>} sub="This semester"/>
@@ -1456,13 +1416,21 @@ export default function ManageSchedule() {
               </p>
             </div>
           </div>
-          
+
+          <button
+              onClick={handleFinalize}
+              disabled={unresolvedItems.length > 0}
+              title={unresolvedItems.length > 0 ? "Please resolve missing rooms/times first" : "Finalize all drafts"}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold shadow-md transition-colors ${
+                unresolvedItems.length > 0 
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
+                  : "bg-[#8B0000] hover:bg-[#6B0000] text-white shadow-[#8B0000]/20"
+              }`}
+            >
+              <ShieldCheck size={14}/> Finalize Schedules
+            </button>
+
           <div className="flex flex-wrap gap-2 w-full sm:w-auto shrink-0">
-            {lastReasoning && (
-              <button onClick={() => setModal("reasoning")} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold border border-violet-300 bg-white text-violet-700 hover:bg-violet-100 transition-colors">
-                <Info size={14}/> Reasoning
-              </button>
-            )}
             <button onClick={handleDeterministicFix} className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold shadow-md shadow-green-200 transition-colors">
               <CheckCircle2 size={14}/> Auto-Fix Rooms
             </button>
@@ -1603,7 +1571,6 @@ export default function ManageSchedule() {
       {(modal==="add"||modal==="edit") && <ScheduleFormModal editing={modal==="edit"?selected:null} onSave={handleSave} onClose={closeModal} activeSem={activeSem} curriculums={curriculums} otherFacs={otherFacs} otherRooms={otherRooms}/>}
       {modal==="delete" && selected && <DeleteModal schedule={selected} onConfirm={handleDelete} onClose={closeModal}/>}
       {modal==="scan" && <ConflictScanModal initialConflicts={conflicts} onApplyFix={handleApplyFix} onApplyTransfers={handleApplyTransfers} onClose={closeModal} onFinalize={handleFinalize}/>}
-      {modal==="reasoning" && lastReasoning && <ReasoningModal data={lastReasoning} onClose={closeModal}/>}
       {modal==="fixResults" && fixResults && <AutoFixResultsModal data={fixResults} onClose={closeModal}/>}
       {modal==="setup" && <SetupSectionsModal onClose={closeModal} activeSem={activeSem} onSave={handleSetupSections}/>}
     </div>
