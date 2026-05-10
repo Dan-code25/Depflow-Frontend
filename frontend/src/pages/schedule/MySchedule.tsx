@@ -14,7 +14,6 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import {
   getUniqueCourses,
-  getUniqueDaysFromSchedule,
   filterScheduleData,
 } from "../../utils/scheduleFilters";
 import { getMySchedule } from "../../services/scheduleService";
@@ -60,14 +59,20 @@ export default function MySchedule() {
     loadSchedule();
   }, []);
 
-  // Get unique courses and days from data
+  // All days of the week
+  const ALL_DAYS = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
+
+  // Get unique courses from data
   const uniqueCourses = useMemo(
     () => getUniqueCourses(scheduleData),
-    [scheduleData],
-  );
-
-  const uniqueDays = useMemo(
-    () => getUniqueDaysFromSchedule(scheduleData),
     [scheduleData],
   );
 
@@ -165,7 +170,7 @@ export default function MySchedule() {
                         className="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent transition-all"
                       >
                         <option value="">All Days</option>
-                        {uniqueDays.map((day) => (
+                        {ALL_DAYS.map((day) => (
                           <option key={day} value={day}>
                             {day}
                           </option>
@@ -215,11 +220,23 @@ export default function MySchedule() {
                 </button>
               </div>
 
+              {/* No Schedule Message */}
+              {filteredData.length === 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                  <p className="text-yellow-700 text-sm font-medium">
+                    No schedule assigned for{" "}
+                    {selectedDay ? `${selectedDay}` : "the selected filters"}
+                  </p>
+                </div>
+              )}
+
               {/* List View */}
-              {view === "list" && <ScheduleListView data={filteredData} />}
+              {view === "list" && filteredData.length > 0 && (
+                <ScheduleListView data={filteredData} />
+              )}
 
               {/* Timetable View */}
-              {view === "timetable" && (
+              {view === "timetable" && filteredData.length > 0 && (
                 <div className="bg-white rounded-lg">
                   <ScheduleTimetable data={filteredData} readOnly={true} />
                 </div>

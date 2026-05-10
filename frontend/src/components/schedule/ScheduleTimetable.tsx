@@ -37,7 +37,15 @@ const TIME_LABELS = [
   "19:00",
   "20:00",
 ];
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const DAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 function toMins(time: string): number {
   const [h, m] = time.split(":").map(Number);
