@@ -660,65 +660,84 @@ function AutoFixResultsModal({ data, onClose }: {
 // CARD & TIMETABLE VIEWS (Minified)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CardView({ data, otherFacs = [], otherRooms = [] , onEdit, onDelete }: any) {
+function ListView({ data, otherFacs = [], otherRooms = [] , onEdit, onDelete }: any) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="space-y-3">
       {data.map((s: any)=>{
-        const f=getFaculty(s.faculty_id),sub=getSubject(s.subject_id),r=getRoom(s.room_id ?? "");
+        const f=getFaculty(s.faculty_id), sub=getSubject(s.subject_id), r=getRoom(s.room_id ?? "");
         const isGuest = !!s.other_faculty_id;
-        const isUnassigned = s.faculty_id === "TBD" && !isGuest; // Only 'Needs Faculty' if BOTH are empty
+        const isUnassigned = s.faculty_id === "TBD" && !isGuest;
         const guestFacName = otherFacs.find((x : any) => x.id === s.other_faculty_id)?.faculty_name || "Guest Faculty";
-        const guestRoomName = otherRooms.find((x : any) => x.id === s.other_room_id)?.name || "Guest Room";
+        
+        // 🚨 FIX: Changed .name to .room_name to correctly fetch custom rooms
+        const guestRoomName = otherRooms.find((x : any) => x.id === s.other_room_id)?.room_name || "Guest Room";
+
         return (
-          <div key={s.schedule_id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-lg transition-shadow">
-            <div className={`h-1.5 bg-[#8B0000]`}/>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-3">
+          <div key={s.schedule_id} className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow flex flex-col xl:flex-row items-stretch group">
+            <div className="w-1.5 bg-[#8B0000] shrink-0" />
+            <div className="p-4 flex-1 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+              
+              {/* Subject & Section */}
+              <div className="flex-1 min-w-[200px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-sm font-black text-gray-900">{sub?.code}</span>
+                  <StatusBadge status={s.status}/>
+                </div>
+                <p className="text-xs text-gray-500 mb-1.5 truncate">{sub?.name} • {sub?.units} units</p>
+                <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-100 rounded text-[11px] font-bold text-gray-700">
+                  <Users size={12} className="text-gray-400"/> {s.section}
+                </div>
+              </div>
+
+              {/* Schedule Info */}
+              <div className="flex-1 min-w-[180px] flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-xs text-gray-700">
+                  <CalendarDays size={13} className="text-gray-400 shrink-0"/>
+                  <span className={s.day === "TBD" ? "text-amber-600 italic font-medium" : "font-semibold"}>
+                    {s.day === "TBD" ? "TBA" : s.day}
+                  </span>
+                  <span className="text-gray-300">|</span>
+                  <Clock size={13} className="text-gray-400 shrink-0"/>
+                  <span className={s.start_time === "TBD" ? "text-amber-600 italic font-medium" : "font-semibold"}>
+                    {s.start_time === "TBD" ? "TBA" : `${s.start_time} - ${s.end_time}`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700">
+                  <DoorOpen size={13} className="text-gray-400 shrink-0"/>
+                  <span className="font-semibold truncate">
+                    {s.other_room_id ? guestRoomName : (r?.room ?? "TBA")}
+                  </span>
+                </div>
+              </div>
+
+              {/* Faculty Info & Actions */}
+              <div className="flex-1 min-w-[200px] flex items-center justify-between gap-4 w-full xl:w-auto mt-2 xl:mt-0 pt-3 xl:pt-0 border-t xl:border-t-0 border-gray-100">
                 {isUnassigned ? (
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0"><Users size={13} className="text-amber-600"/></div>
-                    <div><p className="text-xs font-bold text-amber-700">Needs Faculty</p><p className="text-[11px] text-amber-500">Click Edit to assign</p></div>
+                    <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center border border-amber-100 shrink-0"><Users size={14} className="text-amber-500"/></div>
+                    <div><p className="text-xs font-bold text-amber-700">Needs Faculty</p></div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2.5">
-                    {/* 👇 Update Avatar and Name to handle Guests */}
                     <img 
                       src={f?.photo_url || placeholderImg} 
-                      alt="Profile" 
-                      className="w-7 h-7 rounded-full object-cover border border-gray-200" 
-                      onError={(e) => { 
-                        e.currentTarget.src = placeholderImg; // If DB link breaks, swap to default
-                        e.currentTarget.onerror = null; // Prevents infinite loop if default asset is missing
-                      }} />
-                    <div>
-                      <p className="text-xs font-bold text-gray-900">{isGuest ? guestFacName : getFacultyName(f)}</p>
-                      <p className="text-[11px] text-gray-400">{isGuest ? "External Professor" : f?.personal.designation}</p>
+                      className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0" 
+                      onError={(e) => { e.currentTarget.src = placeholderImg; e.currentTarget.onerror = null; }} 
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-900 truncate">{isGuest ? guestFacName : getFacultyName(f)}</p>
+                      <p className="text-[10px] text-gray-500 truncate">{isGuest ? "External Professor" : f?.personal?.employmentType}</p>
                     </div>
                   </div>
                 )}
-                <StatusBadge status={s.status}/>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-3 mb-3">
-                <p className="text-sm font-black text-primary">{sub?.code}</p>
-                <p className="text-xs text-gray-700 mt-0.5">{sub?.name}</p>
-                <p className="text-[11px] text-gray-400 mt-1">{sub?.units} units · {s.section}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {([["Day", s.day], ["Time", s.start_time === "TBD" ? "TBD" : `${s.start_time}–${s.end_time}`]] as [string,string][]).map(([k,v])=>(
-                  <div key={k} className={`rounded-lg p-2 ${v==="TBD" ? "bg-amber-50" : "bg-gray-50"}`}>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{k}</p>
-                    <p className={`text-xs font-semibold mt-0.5 ${v==="TBD" ? "text-amber-600 italic" : "text-gray-700"}`}>{v}</p>
-                  </div>
-                ))}
-                <div className="col-span-2 bg-gray-50 rounded-lg p-2">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Room</p>
-                  <p className="text-xs font-semibold text-gray-700 mt-0.5">{s.other_room_id ? guestRoomName : (r?.room ?? "—")}</p>
+
+                {/* Hover Actions */}
+                <div className="flex items-center gap-1 xl:border-l border-gray-100 xl:pl-4 xl:ml-2 opacity-100 xl:opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={()=>onEdit(s)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Edit"><Pencil size={14}/></button>
+                  <button onClick={()=>onDelete(s)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Remove"><Trash2 size={14}/></button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={()=>onEdit(s)} className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"><Pencil size={12}/> Edit</button>
-                <button onClick={()=>onDelete(s)} className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-red-200 rounded-xl text-xs font-semibold text-red-500 hover:bg-red-50 transition-colors"><Trash2 size={12}/> Remove</button>
-              </div>
+
             </div>
           </div>
         );
@@ -770,7 +789,7 @@ function TimetableView({ data, onEdit, onDelete }: any) {
                   <p className="text-[10px] font-black text-[#8B0000] truncate">{sub?.code}</p>
                   {blockH > 38 && <p className="text-[10px] text-gray-600 truncate">{getFacultyInitials(f)} · {s.section}</p>}
                   {blockH > 56 && <p className="text-[10px] text-gray-400">{s.start_time}–{s.end_time}</p>}
-                  {blockH > 72 && <p className="text-[10px] text-gray-400 truncate">📍 {r?.room ?? "No room"}</p>}
+                  {blockH > 72 && <p className="text-[10px] text-gray-400 truncate">📍 {r?.other_room ?? "No room"}</p>}
                   {blockH > 74 && (
                     <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={e=>{e.stopPropagation();onEdit(s);}} className="flex-1 bg-[#8B0000] text-white text-[9px] font-bold rounded py-0.5">Edit</button>
@@ -799,7 +818,7 @@ function LoadMonitorPanel({ sched }: { sched: ScheduleAssignment[] }) {
     <div className="bg-white border border-gray-100 rounded-2xl p-4">
       <p className="text-sm font-bold text-gray-900 mb-0.5">Load Monitor</p>
       <p className="text-xs text-gray-400 mb-4">Units assigned this semester</p>
-      <div className="space-y-4">
+      <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2">
         {FACULTY_LIST.map(f=>{
           const u = getTotalUnits(sched, f.id);
           const maxUnits = getFacultyMaxUnits(f);
@@ -845,7 +864,7 @@ function ScheduleStatCard({ label, value, icon, sub }: { label:string; value:num
 
 export default function ManageSchedule() {
   const [schedules,      setSchedules]      = useState<ScheduleAssignment[]>([]);
-  const [view,           setView]           = useState<"card"|"timetable">("card");
+  const [view,           setView]           = useState<"list"|"timetable">("list");
   const [search,         setSearch]         = useState("");
   const [filterDay,      setFilterDay]      = useState("All");
   const [filterFac,      setFilterFac]      = useState("All");
@@ -1511,8 +1530,8 @@ export default function ManageSchedule() {
                 <input className={`${inputCls} pl-9`} placeholder="Search faculty, subject code, or section..." value={search} onChange={e=>setSearch(e.target.value)}/>
               </div>
               <div className="flex gap-1.5">
-                {([["card","Card",LayoutGrid],["timetable","Timetable",TableProperties]] as const).map(([id,label,Icon])=>(
-                  <button key={id} onClick={()=>setView(id as "card"|"timetable")} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${view===id ? "bg-[#8B0000] border-[#8B0000] text-white" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}><Icon size={13}/>{label}</button>
+                {([["list","List",LayoutGrid],["timetable","Timetable",TableProperties]] as const).map(([id,label,Icon])=>(
+                  <button key={id} onClick={()=>setView(id as "list"|"timetable")} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${view===id ? "bg-[#8B0000] border-[#8B0000] text-white" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}><Icon size={13}/>{label}</button>
                 ))}
               </div>
             </div>
@@ -1560,7 +1579,7 @@ export default function ManageSchedule() {
           {filtered.length === 0 ? (
             <div className="bg-white border border-gray-100 rounded-2xl p-16 text-center text-gray-400"><CalendarDays size={36} className="mx-auto mb-3 opacity-30"/><p className="text-sm">No assignments found.</p></div>
           ) : (
-            <>{view === "card" && <CardView data={filtered} otherFacs={otherFacs} otherRooms={otherRooms} onEdit={openEdit} onDelete={openDelete}/>}
+            <>{view === "list" && <ListView data={filtered} otherFacs={otherFacs} otherRooms={otherRooms} onEdit={openEdit} onDelete={openDelete}/>}
             {view === "timetable" && <TimetableView data={filtered} otherFacs={otherFacs} otherRooms={otherRooms} onEdit={openEdit} onDelete={openDelete}/>}</>
           )}
         </div>
@@ -1577,8 +1596,4 @@ export default function ManageSchedule() {
     </AdminLayout>
   );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REASONING MODAL
-// ─────────────────────────────────────────────────────────────────────────────
 
