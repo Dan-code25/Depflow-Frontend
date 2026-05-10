@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "../../components/layout/AdminLayout";
-import { AnalyticsHeader } from "../../components/admin/AnalyticsHeader";
+import { PageHeader } from "../../components/admin/PageHeader";
 import {
   CoreGroupBarChart,
   type CoreGroupData,
@@ -14,6 +14,7 @@ import {
   type EmploymentTypeData,
 } from "../../components/admin/EmploymentTypePieChart";
 import { analyticsService } from "../../services/analyticsService";
+import { BarChart3 } from "lucide-react";
 
 export default function AdminAnalyticsPage() {
   // Core Group Bar Chart State
@@ -120,9 +121,10 @@ export default function AdminAnalyticsPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         {/* Header Section */}
         <div className="container-main pt-0 pb-8">
-          <AnalyticsHeader
+          <PageHeader
             title="Analytics"
             description="View faculty statistics and analytics across different dimensions"
+            Icon = {<BarChart3 size={28} className="text-burgundy" />}
           />
         </div>
 

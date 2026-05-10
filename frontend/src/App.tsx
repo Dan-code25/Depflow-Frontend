@@ -16,6 +16,7 @@ import ManageFacultyPage from "./pages/admin/ManageFacultyPage";
 import FacultyProfileViewPage from "./pages/admin/FacultyProfileViewPage";
 import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
 import AdminManageSchedule from "./pages/admin/AdminManageSchedule";
+import MySchedule from "./pages/schedule/MySchedule";
 
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -45,6 +46,7 @@ function AppRoutes() {
         <Route path="/admin/faculty/:id" element={<FacultyProfileViewPage />} />
         <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
         <Route path="/admin/manage-schedule" element={<AdminManageSchedule />} />
+        <Route path="/admin/my-schedule" element={<MySchedule />} />
 
 
       </Route>
@@ -64,6 +66,7 @@ function AppRoutes() {
           path="/faculty/faculty/:id"
           element={<FacultyProfileViewPage />}
         />
+        <Route path="/faculty/my-schedule" element={<MySchedule />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

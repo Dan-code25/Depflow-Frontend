@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
-import { Home, User, LogOut, Megaphone, Briefcase } from "lucide-react";
+import { Home, User, LogOut, Megaphone, Briefcase, CalendarClock } from "lucide-react";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 
 import { useLogout } from "../../hooks/useLogout";
@@ -28,6 +28,7 @@ export function FacultySidebar({
       icon: Briefcase,
       path: "/faculty/information",
     },
+    { label: "My Schedule", icon: CalendarClock, path: "/faculty/my-schedule" },
     { label: "My Profile", icon: User, path: "/faculty/profile" },
   ];
 

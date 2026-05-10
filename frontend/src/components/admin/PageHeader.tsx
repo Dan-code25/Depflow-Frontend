@@ -1,15 +1,16 @@
-import { BarChart3 } from "lucide-react";
 
-interface AnalyticsHeaderProps {
+
+interface PageHeaderProps {
   title: string;
   description: string;
+  Icon?: React.ReactNode;
 }
 
-export function AnalyticsHeader({ title, description }: AnalyticsHeaderProps) {
+export function PageHeader({ title, description, Icon }: PageHeaderProps) {
   return (
     <div className="bg-white border border-slate-200 rounded-lg p-6 sm:p-8 mb-8 shadow-sm">
       <div className="flex items-center gap-3 mb-2">
-        <BarChart3 size={28} className="text-burgundy" />
+        {Icon && <div className="flex-shrink-0">{Icon}</div>}
         <h1 className="text-2xl sm:text-3xl font-bold text-charcoal">
           {title}
         </h1>

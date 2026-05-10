@@ -8,6 +8,7 @@ import {
   BarChart3,
   User,
   LogOut,
+  CalendarClock,
 } from "lucide-react";
 import { ConfirmDialog } from "../common/ConfirmDialog";
 import { useLogout } from "../../hooks/useLogout";
@@ -30,6 +31,7 @@ export function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     { label: "Manage Schedule", icon: Calendar, path: "/admin/manage-schedule" },
     { label: "Announcements", icon: Megaphone, path: "/admin/announcements" },
     { label: "Analytics", icon: BarChart3, path: "/admin/analytics" },
+    { label: "My Schedule", icon: CalendarClock, path: "/admin/my-schedule" },
     { label: "My Profile", icon: User, path: "/admin/profile" },
   ];
 
