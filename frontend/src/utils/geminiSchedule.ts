@@ -30,6 +30,7 @@ export interface GeminiScheduleContext {
     employmentType: string;
     maxUnits: number;
     assignedUnits: number;
+    specializations: string[]; // List of subject codes this faculty can teach (if empty or missing, can teach all)
   }[];
   subjects: {
     id: string;
@@ -64,8 +65,8 @@ export interface ValidationContext extends GeminiScheduleContext {
     allFaculty: Array<{
     id: string;
     personal: {
-      firstName: string;
-      lastName: string;
+      first_name: string;
+      last_name: string;
       employmentType: string;
     };
     preferences?: {
@@ -81,6 +82,8 @@ export interface ValidationContext extends GeminiScheduleContext {
     facilityType?: string;
   }>;
 }
+
+
 const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
 const GEMINI_API_URL = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
@@ -88,6 +91,15 @@ export async function enrichConflictsWithGemini(
   context: GeminiScheduleContext,
   validationContext?: ValidationContext
 ): Promise<GeminiConflictSuggestion[]> {
+
+  console.log("[DEBUG] enrichConflictsWithGemini called with:", {
+    facultyCount: context.faculty.length,
+    faculty: context.faculty,
+    detectedConflictCount: context.detectedConflicts.length,
+    detectedConflicts: context.detectedConflicts
+  });
+ 
+
 
   // Pre-filter: remove conflict types that Gemini should never touch because
   // they are either auto-fixed by the local engine or are valid by exception.
@@ -103,15 +115,23 @@ export async function enrichConflictsWithGemini(
 
     // Filter out conflicts already handled by deterministic local fixes
     // 🚩 FIX: Changed 'prefix' to 'pre' to match the iterator variable
-    if (["labhr-", "nstp-day-", "lablec-", "room-", "time-"].some((pre: string) => c.id.startsWith(pre))) {
+    if (["labhr-", "nstp-day-", "lablec-", "room-", "time-", "tbd-fac-", "tbd-room-"].some((pre: string) => c.id.startsWith(pre))) {
       return false;
     }
     
     return true;
   });
 
+    console.log("[DEBUG] After filtering conflicts:", {
+    beforeFilterCount: context.detectedConflicts.length,
+    afterFilterCount: filteredConflicts.length,
+    filteredConflicts: filteredConflicts
+  });
+
   // Nothing left to enrich after filtering
-  if (filteredConflicts.length === 0) return [];
+  if (filteredConflicts.length === 0) {
+    console.log("[DeptFlow] Load Advisor: No hard conflicts. Focusing entirely on proactive load balancing...");
+  }
 
   const enrichContext: GeminiScheduleContext = {
     ...context,
@@ -119,6 +139,8 @@ export async function enrichConflictsWithGemini(
   };
 
   const prompt = buildPrompt(enrichContext);
+
+  console.log("[DEBUG] About to call Gemini API with context:", enrichContext);
 
   const response = await fetch(GEMINI_API_URL, {
     method: "POST",
@@ -128,8 +150,8 @@ export async function enrichConflictsWithGemini(
       generationConfig: {
         // Force JSON output — supported by Gemini 2.0 Flash
         responseMimeType: "application/json",
-        temperature: 0.3,      // Low temp = consistent, factual suggestions
-        maxOutputTokens: 8192, // Must be high — conflict IDs contain full Date.now()
+        temperature: 0.7,      // Low temp = consistent, factual suggestions
+        maxOutputTokens: 16000, // Must be high — conflict IDs contain full Date.now()
                                // timestamps (19-char strings). With 4+ conflicts and
                                // long suggestions, 4096 can still truncate. 8192 is safe.
       },
@@ -138,17 +160,38 @@ export async function enrichConflictsWithGemini(
 
   if (!response.ok) {
     const err = await response.text();
+      console.error("[DEBUG] Gemini API error response:", {
+      status: response.status,
+      error: err
+    });
     throw new Error(`Gemini API error ${response.status}: ${err}`);
   }
 
   const data = await response.json();
   const rawText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+  console.log("🤖 RAW GEMINI JSON OUTPUT 🤖\n", rawText);
+
+  console.log("[DEBUG] Full Gemini response data:", {
+    hasData: !!data,
+    hasCandidate: !!data?.candidates?.[0],
+    hasContent: !!data?.candidates?.[0]?.content,
+    parts: data?.candidates?.[0]?.content?.parts,
+    rawText: rawText
+  });
+
+
   if (!rawText) {
     console.warn("[DeptFlow] Gemini returned an empty response.");
     return [];
   }
 
   const suggestions = parseGeminiResponse(rawText);
+
+    console.log("[DEBUG] Parsed suggestions:", {
+    count: suggestions.length,
+    suggestions: suggestions
+  });
 
   // ── NEW: Pre-flight validation (Phase 2) ────────────────────────────────
   if (validationContext) {
@@ -168,24 +211,32 @@ export async function enrichConflictsWithGemini(
 
 function buildPrompt(ctx: GeminiScheduleContext): string {
   // Extract only the entry IDs referenced in conflicts
-  const involvedIds = new Set(
-    ctx.detectedConflicts.flatMap(c => {
-      const match = c.id.match(/[a-z]+-(.+)/);
-      if (!match) return [];
-      return match[1].split("|");
-    })
-  );
+  
+  console.log("[DEBUG] buildPrompt received context:", {
+    facultyCount: ctx.faculty.length,
+    faculty: ctx.faculty.map(f => ({
+      name: f.name,
+      assignedUnits: f.assignedUnits,
+      maxUnits: f.maxUnits,
+      specializations: f.specializations
+    })),
+    subjectCount: ctx.subjects.length,
+    scheduleCount: ctx.schedules.length,
+    conflictCount: ctx.detectedConflicts.length
+  });
 
-  const relevantSchedules = involvedIds.size > 0
-    ? ctx.schedules.filter(s => involvedIds.has(s.id))
-    : ctx.schedules;
+  console.log("[DEBUG] First schedule ID:", ctx.schedules[0]?.id);
 
-  const involvedFacultyNames = new Set(relevantSchedules.map(s => s.facultyName));
-  const relevantFaculty = ctx.faculty.filter(f => involvedFacultyNames.has(f.name));
+  const relevantSchedules = ctx.schedules;
 
-  const facultyList = relevantFaculty
+
+  console.log("[DEBUG] relevantSchedules after filter:", relevantSchedules.length);
+
+  const facultyList = ctx.faculty
     .map(f => `${f.name}(${f.employmentType},${f.assignedUnits}/${f.maxUnits}u)`)
     .join(", ");
+
+  console.log("[DEBUG] facultyList string for prompt:", facultyList);
 
   const scheduleList = relevantSchedules
     .map(s => {
@@ -194,106 +245,211 @@ function buildPrompt(ctx: GeminiScheduleContext): string {
       return `[${s.id}]${s.subjectCode}${labTag}|${s.facultyName}|${s.section}|${s.room}|${s.day} ${s.startTime}-${s.endTime}`;
     })
     .join("\n");
-
-  const conflictList = ctx.detectedConflicts
-    .map(c => `conflictId:"${c.id}"|${c.type}|"${c.label}": ${c.message}`)
-    .join("\n");
-
+  console.log("[DEBUG] scheduleList for prompt:\n", scheduleList);
+  console.log("[DEBUG] relevantSchedules:", {
+    count: relevantSchedules.length,
+    firstSchedule: relevantSchedules[0],
+    allSchedules: ctx.schedules.length
+  });
   const subjectLegend = ctx.subjects
     .filter(s => relevantSchedules.some(r => r.subjectCode === s.code))
     .map(s => `${s.code}(${s.units}u,${s.facilityType ?? "lecture"})`)
     .join(", ");
 
+  console.log("[DEBUG] subjectLegend:", subjectLegend);
+  const facultySpecializationList = ctx.faculty
+    .map(f => {
+    const specs = f.specializations || [];
+    return `${f.name} (${f.employmentType}, ${f.assignedUnits}/${f.maxUnits}u): [${specs.join(", ")}]`;
+    })
+    .join("\n");
+   console.log("[DEBUG] facultySpecializationList:\n", facultySpecializationList);
+
+   const facultyTeachingMap = new Map<string, Set<string>>();
+    ctx.schedules.forEach(s => {
+      if (!facultyTeachingMap.has(s.facultyName)) {
+        facultyTeachingMap.set(s.facultyName, new Set());
+      }
+      facultyTeachingMap.get(s.facultyName)!.add(s.subjectCode);
+    });
+
+    const currentlyAssignedSubjects = Array.from(facultyTeachingMap.entries())
+      .map(([facultyName, subjects]) => `${facultyName}: [${Array.from(subjects).join(", ")}]`)
+      .join("\n");
+
+    const conflictList = ctx.detectedConflicts
+      .map(c => `conflictId:"${c.id}"|${c.type}|"${c.label}": ${c.message}`)
+      .join("\n");
+ 
+  // ✅ DEBUG: Conflict list
+  console.log("[DEBUG] conflictList:\n", conflictList);
+  console.log("[DEBUG] conflictList length:", ctx.detectedConflicts.length);
+
   // ── PHASE 3: NEW FOCUSED PROMPT ────────────────────────────────────────
-  return `
-You are a faculty REASSIGNMENT advisor for TUP (Technological University of the Philippines).
+  const finalPrompt = `
+    You are the Master AI Load Advisor for a University Department at TUP.
+    Your SINGLE responsibility is to suggest intelligent faculty load rebalancing based on specializations.
+    You will NOT fill unassigned subjects. You will NOT resolve conflicts.
+    You will ONLY provide proactive load balancing suggestions.
+    ═══════════════════════════════════════════════════════════════════════════════
+    CURRENT STATE:
+    Faculty Load Status: ${facultyList}
+    Faculty Subject Specializations:
+    ${facultySpecializationList}
+    Subject Info (code|units|type): ${subjectLegend}
+    Currently Assigned Schedules:
+    ${scheduleList}
+    CURRENTLY ASSIGNED SUBJECTS BY FACULTY:
+    ${currentlyAssignedSubjects}
+    ═══════════════════════════════════════════════════════════════════════════════
+    ⚠️ CRITICAL DIRECTION RULES (READ CAREFULLY):
 
-YOUR SOLE JOB: Suggest which overloaded faculty should transfer their subjects to other faculty.
+    YOU MUST TRANSFER WORK FROM OVERLOADED TO UNDERLOADED.
+    NEVER transfer work FROM underloaded TO more underloaded.
 
-⚠️ CRITICAL: You are NOT responsible for schedule detection, room changes, or time changes.
-The frontend has already detected all conflicts. Your job is ONLY to suggest reassignments.
+    You can ONLY suggest transferring subjects that appear in the "CURRENTLY ASSIGNED SUBJECTS BY FACULTY" list.
+    Do NOT suggest transferring subjects that are not scheduled.
+    Do NOT suggest subjects based on specializations alone - they must be actually taught.
+    
+    SOURCE (take work FROM here): Faculty at ≥ 85% load
+    - Juan Dela Cruz (21/21u = 100%) ← GIVE AWAY work
+    - Jevon Mackie Castro (21/21u = 100%) ← GIVE AWAY work
+    - Dan Jheniel Bringas (20/21u = 95%) ← GIVE AWAY work
 
-═══════════════════════════════════════════════════════════════════════════════
+    DESTINATION (give work TO here): Faculty at < 50% load
+    - Jan Eilbert Lee (0/12u = 0%) ← RECEIVE work
+    - Dolores Montesines (6/21u = 28%) ← RECEIVE work
+    - Peragrino Amador (6/21u = 28%) ← RECEIVE work
 
-CURRENT STATE:
+    WRONG DIRECTION (DO NOT DO THIS):
+    ❌ Taking from Peragrino (6/21u = 28% UNDERLOADED) and giving to Jan (0/12u = 0% MORE UNDERLOADED)
+    ❌ This makes Peragrino WORSE and wastes Jan's capacity on someone else's subjects
+    ❌ YOU WILL BE REJECTED IF YOU DO THIS
+    ═══════════════════════════════════════════════════════════════════════════════
+    ▶️ YOUR RESPONSIBILITY: INTELLIGENT LOAD BALANCING (SKILL-BASED TRANSFERS)
 
-Faculty Load Status: ${facultyList}
+    GOAL:
+    Find faculty who are OVERLOADED (at or near their maximum load).
+    Take ONE of their subjects.
+    Give it to an UNDERLOADED faculty member who can teach it.
 
-Subject Info (code|units|type): ${subjectLegend}
+    THE ALGORITHM (UNIDIRECTIONAL):
 
-Current Schedules:
-${scheduleList}
+    STEP 1 - FIND SOURCE (OVERLOADED):
+    Look for faculty at ≥ 85% load:
+    - Juan Dela Cruz (21/21u) ← TAKE FROM HERE
+    - Jevon Mackie Castro (21/21u) ← TAKE FROM HERE
+    - Dan Jheniel Bringas (20/21u) ← TAKE FROM HERE
+    - Fernando Renegado (18/21u) ← TAKE FROM HERE
+    - Darwin Vargas (18/21u) ← TAKE FROM HERE
+    - Priscilla Bator (18/21u) ← TAKE FROM HERE
+    - John Lennon (19/21u) ← TAKE FROM HERE
 
-CONFLICTS DETECTED (by frontend):
-${conflictList}
+    STEP 2 - PICK A SUBJECT FROM OVERLOADED:
+    Choose ONE subject this overloaded faculty teaches.
 
-═══════════════════════════════════════════════════════════════════════════════
+    STEP 3 - FIND DESTINATION (UNDERLOADED):
+    Look for faculty at < 50% load:
+    - Jan Eilbert Lee (0/12u) ← GIVE TO HERE
+    - Dolores Montesines (6/21u) ← GIVE TO HERE
+    - Peragrino Amador (6/21u) ← GIVE TO HERE
+    - Francis Dela Cruz (6/12u) ← GIVE TO HERE
+    - Maria Carmela Francisco (6/12u) ← GIVE TO HERE
 
-YOUR TASK:
+    STEP 4 - CHECK SKILL MATCH:
+    Does the DESTINATION faculty have the subject in their specializations?
+    If yes → VALID transfer
+    If no → SKIP this pairing, try a different subject or destination
 
-For EACH overload conflict (type="HARD"), suggest ONE faculty reassignment:
-  1. Name the overloaded faculty member
-  2. Name the subject they should transfer (specific code like CS211L-M)
-  3. Name the TARGET faculty (specific first+last name) who should take it
-  4. Verify your suggestion works by checking:
-     - Target faculty exists in the list above
-     - Target faculty is not already overloaded
-     - Target faculty's load + subject units ≤ their max
+    STEP 5 - CHECK CAPACITY:
+    Can DESTINATION faculty take this subject without exceeding their max?
+    If yes → VALID transfer
+    If no → SKIP, try a different subject
 
-═══════════════════════════════════════════════════════════════════════════════
+    STEP 6 - SUGGEST THE TRANSFER:
+    "Transfer X FROM overloaded-faculty (at 21/21u) TO underloaded-faculty (at 0/12u)"
+    Result: overloaded-faculty drops to lower load, underloaded-faculty gains work
+    ═══════════════════════════════════════════════════════════════════════════════
+    COMPREHENSIVE APPROACH:
 
-RULES (MUST FOLLOW):
+    You have 7 overloaded faculty members and 5 underloaded faculty members.
+    Your goal is to find and suggest MULTIPLE TRANSFERS (5-15 suggestions minimum).
 
-1. LOAD LIMITS: Full-time max = 21u, Part-time max = 12u
-   Only suggest transfers TO faculty with available capacity.
+    For each overloaded faculty member, explore:
+    1. All their subjects
+    2. All possible underloaded recipients who can teach them
+    3. Generate multiple transfer options
 
-2. FACULTY NAMES: Use EXACT names from the "Faculty Load Status" list above.
-   Example: "Darwin Vargas" NOT "another faculty member"
-   Example: "Dr. Santos" NOT "an underloaded professor"
+    Example:
+    - Juan (21/21u) teaches 5 subjects → Could transfer any of those 5 to different recipients
+    - Darwin (18/21u) teaches 3 subjects → Could transfer to multiple recipients
+    - Each subject might fit multiple underloaded faculty members
 
-3. ONLY REASSIGNMENTS: Suggest ONLY faculty transfers. Do NOT suggest:
-   ✗ Time/day changes (frontend handles these)
-   ✗ Room changes (frontend handles these)
-   ✗ Schedule restructuring (frontend handles these)
-   ✓ ONLY: "Move subject X from Faculty A to Faculty B"
+    Do NOT stop at 1-2 suggestions. Explore the full matrix of possibilities.
+    ═══════════════════════════════════════════════════════════════════════════════
+    EXAMPLES OF CORRECT DIRECTION:
 
-4. VERIFICATION REQUIRED: For each suggestion, show why it works:
-   Example: "Transfer CS211L-M (3u) from Dan Dandan (25/21u) to Darwin Vargas (14/21u).
-            Dan becomes 22/21u (still overloaded but better). Darwin becomes 17/21u (okay)."
+    ✅ CORRECT:
+    Transfer CC101-M (3u) FROM Juan Dela Cruz (21/21u - OVERLOADED) 
+                        TO Jan Eilbert Lee (0/12u - UNDERLOADED)
+    Result: Juan 18/21u, Jan 3/12u ✓ (overloaded faculty relieved, underloaded faculty balanced)
 
-5. ONE FACULTY AT A TIME: If a faculty is overloaded by 4 units, suggest ONE transfer.
-   Don't suggest transferring 2+ subjects in one suggestion.
+    ✅ CORRECT:
+    Transfer IT241L-M (3u) FROM Jevon Mackie Castro (21/21u - OVERLOADED)
+                          TO Dolores Montesines (6/21u - UNDERLOADED)
+    Result: Jevon 18/21u, Dolores 9/21u ✓ (both moving toward balance)
 
-6. NO SPECULATION: Only suggest transfers between faculty ACTUALLY listed above.
-   Don't invent new faculty or suggest unrealistic transfers.
+    ❌ WRONG (DO NOT OUTPUT):
+    Transfer CC101-M (3u) FROM Peragrino Amador (6/21u - UNDERLOADED)
+                        TO Jan Eilbert Lee (0/12u - EVEN MORE UNDERLOADED)
+    Result: Peragrino 3/21u (worse!), Jan 3/12u (defeats purpose) ✗
 
-═══════════════════════════════════════════════════════════════════════════════
+    ❌ WRONG (DO NOT OUTPUT):
+    Transfer IT241L-M (3u) FROM Dolores Montesines (6/21u - UNDERLOADED)
+                          TO Jan Eilbert Lee (0/12u - EVEN MORE UNDERLOADED)
+    Result: Dolores 3/21u (worse!), Jan 3/12u ✗
+    ═══════════════════════════════════════════════════════════════════════════════
+    CRITICAL VALIDATION:
 
-RESPONSE FORMAT (MUST BE EXACTLY THIS):
+    Before EVERY suggestion, verify:
+    1. SOURCE faculty is at ≥ 85% load (overloaded, at or near max)
+    2. DESTINATION faculty is at < 50% load (underloaded, has room)
+    3. SOURCE load > DESTINATION load (moving FROM high TO low)
+    4. DESTINATION has the subject in specializations
+    5. DESTINATION has capacity after receiving the subject
 
-Return ONLY a valid JSON array — no markdown, no extra text:
+    If ANY of these is false, DO NOT output that suggestion.
+    ═══════════════════════════════════════════════════════════════════════════════
+   RESPONSE FORMAT (MUST PROVIDE COMPREHENSIVE LIST):
 
-[
-  {
-    "conflictId": "<exact id from CONFLICTS list above>",
-    "suggestion": "<specific reassignment only>. Transfer <SUBJECT_CODE> (Xu) from <Current Faculty> to <Target Faculty Name>. Verification: <Current Faculty> becomes X/Zu, <Target Faculty> becomes Y/Zu.",
-    "summaryNote": "<1 sentence summary of the transfer>"
-  }
-]
+    Return ONLY a valid JSON array with MULTIPLE suggestions (minimum 5-10).
+    Do not wrap in markdown. Each suggestion MUST have all three fields.
 
-EXAMPLES OF GOOD SUGGESTIONS:
-✓ "Transfer CS251L-M (1u) from Dan Dandan (25/21u) to Darwin Vargas (14/21u)"
-✓ "Move IS213-M (3u) from Dan Dandan to Dr. Reyes who has capacity (17/21u)"
+    [
+      {
+        "conflictId": "load-advice-001",
+        "suggestion": "...",
+        "summaryNote": "..."
+      },
+      {
+        "conflictId": "load-advice-002",
+        "suggestion": "...",
+        "summaryNote": "..."
+      },
+      {
+        "conflictId": "load-advice-003",
+        "suggestion": "...",
+        "summaryNote": "..."
+      },
+      ... (more suggestions) ...
+    ]
 
-EXAMPLES OF BAD SUGGESTIONS (DO NOT DO THESE):
-✗ "Move the class to another day"
-✗ "Schedule in a different room"
-✗ "Consider assigning to an available faculty"
-✗ "Move to another faculty member" (no name!)
-✗ "Transfer to another professor" (which professor?!)
-
-═══════════════════════════════════════════════════════════════════════════════
-`.trim();
+    MINIMUM: 5 suggestions
+    EXPECTED: 10-15 suggestions if multiple valid transfers exist
+    DO NOT output fewer than 5 suggestions.
+    ═══════════════════════════════════════════════════════════════════════════════`;
+  console.log("[DEBUG] FINAL PROMPT BEING SENT TO GEMINI:\n", finalPrompt);
+  return finalPrompt.trim();
 }
 
 // ── Response parser ───────────────────────────────────────────────────────────
@@ -359,7 +515,7 @@ function validateSuggestion(
       .trim()
       .toLowerCase();
     const targetFaculty = vCtx.allFaculty.find(
-      f => `${f.personal.firstName} ${f.personal.lastName}`.toLowerCase().includes(targetName.toLowerCase())
+      f => `${f.personal.first_name} ${f.personal.last_name}`.toLowerCase().includes(targetName.toLowerCase())
     );
 
     if (!targetFaculty) {
@@ -381,7 +537,7 @@ function validateSuggestion(
 
     if (!canTeach && targetPrefs.subjectSpecializations && targetPrefs.subjectSpecializations.length > 0) {
       console.warn(
-        `[DeptFlow] ✗ ${targetFaculty.personal.firstName} ${targetFaculty.personal.lastName} ` +
+        `[DeptFlow] ✗ ${targetFaculty.personal.first_name} ${targetFaculty.personal.last_name} ` +
         `cannot teach ${subjectCode} (specializations: ${targetPrefs.subjectSpecializations.join(", ")})`
       );
       return false;
@@ -405,14 +561,14 @@ function validateSuggestion(
 
     if (projectedLoad > maxLoad) {
       console.warn(
-        `[DeptFlow] ✗ ${targetFaculty.personal.firstName} ${targetFaculty.personal.lastName} ` +
+        `[DeptFlow] ✗ ${targetFaculty.personal.first_name} ${targetFaculty.personal.last_name} ` +
         `would exceed capacity: ${projectedLoad}/${maxLoad}u (adding ${subject.units}u to current ${currentLoad}u)`
       );
       return false;
     }
 
     console.log(
-      `[DeptFlow] ✓ Suggestion valid: ${targetFaculty.personal.firstName} ${targetFaculty.personal.lastName} ` +
+      `[DeptFlow] ✓ Suggestion valid: ${targetFaculty.personal.first_name} ${targetFaculty.personal.last_name} ` +
       `can take ${subjectCode} (capacity: ${projectedLoad}/${maxLoad}u)`
     );
     return true;

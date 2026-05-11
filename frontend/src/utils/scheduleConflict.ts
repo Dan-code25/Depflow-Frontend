@@ -118,6 +118,7 @@ export function buildGeminiContext(
       employmentType: f.personal.employmentType,
       maxUnits: getFacultyMaxUnits(f as ReturnType<typeof getFaculty>),
       assignedUnits: getTotalUnits(sched, f.id),
+      specializations: f.preferences?.subjectSpecializations || []
     })),
  
     subjects: SUBJECT_LIST.map((s) => ({

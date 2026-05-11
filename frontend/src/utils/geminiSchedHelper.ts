@@ -698,9 +698,6 @@ export async function generateSchedule(
     const personal = f.personal
       ? (typeof f.personal === 'string' ? JSON.parse(f.personal) : f.personal)
       : null;
-    const prefs = f.preferences
-      ? (typeof f.preferences === 'string' ? JSON.parse(f.preferences) : f.preferences)
-      : null;
 
     return {
       id: f.id || f.faculty_id,  
@@ -710,17 +707,65 @@ export async function generateSchedule(
         employmentType: personal?.employmentType ?? f.employment_type ?? "Full-time",
         status:         personal?.status         ?? f.status          ?? "Active",
       },
-      preferences: prefs ?? {
-        subjectSpecializations: rawSub.map((s: any) => s.subject_code ?? s.code),
-        unavailableDays:        [],
-        preferredDays:          ["Monday","Tuesday","Wednesday","Thursday","Friday"],
-        unavailableTimeSlots:   [],
-        preferredTimeRange:     { start: "07:00", end: "18:00" },
-        preferredRoomTypes:     ["lab","lecture"],
-        priority:               "medium",
-        maxClassesPerDay:       3,
-        maxConsecutiveHours:    4,
-      }
+
+      preferences: (() => {
+        // 1. Hunt down the actual preference object
+        let p: any = {};
+        if (f.faculty_preferences && Array.isArray(f.faculty_preferences) && f.faculty_preferences.length > 0) {
+          p = f.faculty_preferences[0];
+        } else if (f.faculty_preferences && typeof f.faculty_preferences === 'object') {
+          p = f.faculty_preferences;
+        } else if (f.preferences) {
+          p = typeof f.preferences === 'string' ? JSON.parse(f.preferences) : f.preferences;
+        }
+
+        // 2. Safely parse stringified arrays (e.g., '["CC113-M", "CS201-M"]')
+        const safeParseArray = (val: any, fallback: any[]) => {
+          if (!val) return fallback;
+          if (Array.isArray(val)) return val;
+          if (typeof val === 'string') {
+            try {
+              // Handle Supabase Postgres text array format "{Item1, Item2}"
+              if (val.startsWith('{') && val.endsWith('}')) {
+                 return val.slice(1, -1).split(',').map(s => s.replace(/"/g, '').trim());
+              }
+              // Handle standard JSON string '["Item1", "Item2"]'
+              return JSON.parse(val.replace(/""/g, '"'));
+            } catch (e) {
+              console.warn(`[DeptFlow] Failed to parse preference array: ${val}`);
+              return fallback;
+            }
+          }
+          return fallback;
+        };
+
+        // 3. Prepare fallbacks
+        const allSubjects = rawSub.map((s: any) => (s.subject_code ?? s.code ?? "").trim().toUpperCase());
+
+        // 4. Extract and clean the subject specializations
+        // Try snake_case first (Supabase native), then camelCase (frontend mapping)
+        const rawSpecializations = p.subject_specializations || p.subjectSpecializations;
+        let finalSpecializations = safeParseArray(rawSpecializations, allSubjects);
+        
+        // Ensure every subject in the array is an uppercase string for perfect matching
+        finalSpecializations = finalSpecializations.map((s: any) => String(s).trim().toUpperCase());
+
+        // Log it so you can verify in your browser console!
+        console.log(`[DeptFlow] Loaded Specializations for ${f.first_name}:`, finalSpecializations);
+
+        return {
+          subjectSpecializations: finalSpecializations,
+          preferredDays:          safeParseArray(p.preferred_days || p.preferredDays, ["Monday","Tuesday","Wednesday","Thursday","Friday"]),
+          unavailableDays:        safeParseArray(p.unavailable_days || p.unavailableDays, []),
+          preferredTimeRange:     { 
+            start: (p.time_start || p.preferredTimeRange?.start || "07:00").substring(0, 5), 
+            end:   (p.time_end || p.preferredTimeRange?.end || "19:00").substring(0, 5) 
+          },
+          preferredRoomTypes:     safeParseArray(p.preferred_room_types || p.preferredRoomTypes, ["lab","lecture"]),
+          maxClassesPerDay:       p.max_classes_per_day || p.maxClassesPerDay || 3,
+          maxConsecutiveHours:    p.max_consecutive_hours || p.maxConsecutiveHours || 4,
+        };
+      })()
     };
   });
 
@@ -888,19 +933,39 @@ export async function generateSchedule(
             const rooms = ROOM_LIST.filter(r => r.type.toLowerCase() === subject.facilityType.toLowerCase());
             let finalDay = "TBD", finalStart = 0, finalRoom = "TBD", found = false;
 
-            for (const d of DAYS) {
+            const targetFac = FACULTY_LIST.find((f: any) => f.id === facId);
+            const prefs = targetFac?.preferences;
+          
+            const prefDays: string[] = (prefs?.preferredDays?.length) ? prefs.preferredDays : DAYS;
+            const orderedDays = [...new Set([...prefDays, ...DAYS])];
+            
+            const prefStart = parseInt(prefs?.preferredTimeRange?.start?.split(":")[0] || "7");
+            const prefEnd = parseInt(prefs?.preferredTimeRange?.end?.split(":")[0] || "19");
+
+            const allHours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+            const prefHours = allHours.filter(h => h >= prefStart && (h + clockHours) <= prefEnd);
+            const fallbackHours = allHours.filter(h => !prefHours.includes(h) && (h + clockHours) <= 19);
+            const orderedHours = [...prefHours, ...fallbackHours];
+
+
+            for (const d of orderedDays) {
               if (found) break;
+              // Prevent same section from having the same subject twice in one day
               if (draftSchedule.some(s => s.subject_id === subject.id && s.section === sec.label && s.day === d)) continue;
 
-              for (let h = 7; h + clockHours <= 19; h++) {
+              // 🚨 FIX: Now looping through `orderedHours` instead of `let h = 7...`
+              for (const h of orderedHours) {
                 if (found) break;
+                
+                // Check if faculty or section is busy
                 if (draftSchedule.some(s => s.day === d && (s.section === sec.label || s.faculty_id === facId) && 
                     overlaps(`${h}:00`, `${h+clockHours}:00`, s.start_time, s.end_time))) continue;
 
-                  for (const r of rooms) {
-                    if (!draftSchedule.some(s => s.day === d && s.room_id === r.id && 
-                        overlaps(`${h}:00`, `${h+clockHours}:00`, s.start_time, s.end_time))) {
-                      finalDay = d; finalStart = h; finalRoom = r.id; found = true; break;
+                // Find a free room
+                for (const r of rooms) {
+                  if (!draftSchedule.some(s => s.day === d && s.room_id === r.id && 
+                      overlaps(`${h}:00`, `${h+clockHours}:00`, s.start_time, s.end_time))) {
+                    finalDay = d; finalStart = h; finalRoom = r.id; found = true; break;
                   }
                 }
               }

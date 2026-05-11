@@ -657,91 +657,113 @@ function AutoFixResultsModal({ data, onClose }: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CARD & TIMETABLE VIEWS (Minified)
+// LIST VIEW AND TIMETABLE VIEW (Minified)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ListView({ data, otherFacs = [], otherRooms = [] , onEdit, onDelete }: any) {
+function ListView({ data, otherFacs = [], otherRooms = [], onEdit, onDelete }: any) {
   return (
-    <div className="space-y-3">
-      {data.map((s: any)=>{
-        const f=getFaculty(s.faculty_id), sub=getSubject(s.subject_id), r=getRoom(s.room_id ?? "");
-        const isGuest = !!s.other_faculty_id;
-        const isUnassigned = s.faculty_id === "TBD" && !isGuest;
-        const guestFacName = otherFacs.find((x : any) => x.id === s.other_faculty_id)?.faculty_name || "Guest Faculty";
-        
-        // 🚨 FIX: Changed .name to .room_name to correctly fetch custom rooms
-        const guestRoomName = otherRooms.find((x : any) => x.id === s.other_room_id)?.room_name || "Guest Room";
+    <div className="w-full bg-white border border-gray-100 rounded-2xl overflow-hidden font-lexend shadow-sm">
+      {/* ── Table-style Header (Large Screens Only) ── */}
+      <div className="hidden lg:grid grid-cols-[1.2fr_1.5fr_1fr_1.5fr_1fr] gap-4 px-6 py-4 bg-gray-50 border-b border-gray-100">
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subject & Section</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Schedule & Room</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Status</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Faculty Member</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Actions</span>
+      </div>
 
-        return (
-          <div key={s.schedule_id} className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-shadow flex flex-col xl:flex-row items-stretch group">
-            <div className="w-1.5 bg-[#8B0000] shrink-0" />
-            <div className="p-4 flex-1 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
-              
-              {/* Subject & Section */}
-              <div className="flex-1 min-w-[200px]">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-black text-gray-900">{sub?.code}</span>
-                  <StatusBadge status={s.status}/>
-                </div>
-                <p className="text-xs text-gray-500 mb-1.5 truncate">{sub?.name} • {sub?.units} units</p>
-                <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-50 border border-gray-100 rounded text-[11px] font-bold text-gray-700">
-                  <Users size={12} className="text-gray-400"/> {s.section}
-                </div>
-              </div>
+      {/* ── List Rows ── */}
+      <div className="divide-y divide-gray-50">
+        {data.map((s: any) => {
+          const f = getFaculty(s.faculty_id);
+          const sub = getSubject(s.subject_id);
+          const r = getRoom(s.room_id ?? "");
+          const isGuest = !!s.other_faculty_id;
+          const isUnassigned = s.faculty_id === "TBD" && !isGuest;
+          
+          const guestFacName = otherFacs.find((x: any) => x.id === s.other_faculty_id)?.faculty_name || "Guest Faculty";
+          const guestRoomName = otherRooms.find((x: any) => x.id === s.other_room_id)?.room_name || "Guest Room";
 
-              {/* Schedule Info */}
-              <div className="flex-1 min-w-[180px] flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 text-xs text-gray-700">
-                  <CalendarDays size={13} className="text-gray-400 shrink-0"/>
-                  <span className={s.day === "TBD" ? "text-amber-600 italic font-medium" : "font-semibold"}>
-                    {s.day === "TBD" ? "TBA" : s.day}
-                  </span>
-                  <span className="text-gray-300">|</span>
-                  <Clock size={13} className="text-gray-400 shrink-0"/>
-                  <span className={s.start_time === "TBD" ? "text-amber-600 italic font-medium" : "font-semibold"}>
-                    {s.start_time === "TBD" ? "TBA" : `${s.start_time} - ${s.end_time}`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-700">
-                  <DoorOpen size={13} className="text-gray-400 shrink-0"/>
-                  <span className="font-semibold truncate">
-                    {s.other_room_id ? guestRoomName : (r?.room ?? "TBA")}
-                  </span>
-                </div>
-              </div>
+          return (
+            <div key={s.schedule_id} className="group hover:bg-gray-50/50 transition-colors relative">
+              {/* Left Accent Border on Hover */}
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#8B0000] opacity-0 group-hover:opacity-100 transition-opacity" />
 
-              {/* Faculty Info & Actions */}
-              <div className="flex-1 min-w-[200px] flex items-center justify-between gap-4 w-full xl:w-auto mt-2 xl:mt-0 pt-3 xl:pt-0 border-t xl:border-t-0 border-gray-100">
-                {isUnassigned ? (
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center border border-amber-100 shrink-0"><Users size={14} className="text-amber-500"/></div>
-                    <div><p className="text-xs font-bold text-amber-700">Needs Faculty</p></div>
+              <div className="lg:grid lg:grid-cols-[1.2fr_1.5fr_1fr_1.5fr_1fr] flex flex-col gap-4 px-6 py-5 items-start lg:items-center">
+                
+                {/* 1. Subject & Section */}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm font-black text-gray-900">{sub?.code}</p>
+                    <span className="px-1.5 py-0.5 bg-gray-100 text-[10px] font-bold text-gray-500 rounded uppercase">{s.section}</span>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2.5">
-                    <img 
-                      src={f?.photo_url || placeholderImg} 
-                      className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0" 
-                      onError={(e) => { e.currentTarget.src = placeholderImg; e.currentTarget.onerror = null; }} 
-                    />
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-gray-900 truncate">{isGuest ? guestFacName : getFacultyName(f)}</p>
-                      <p className="text-[10px] text-gray-500 truncate">{isGuest ? "External Professor" : f?.personal?.employmentType}</p>
+                  <p className="text-[11px] text-gray-400 truncate max-w-[180px]">{sub?.name}</p>
+                </div>
+
+                {/* 2. Schedule & Room */}
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-[#FFF3F3] rounded-lg text-[#8B0000] shrink-0">
+                    <Clock size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-gray-800">
+                      {s.day === "TBD" ? "TBA" : s.day} • {s.start_time === "TBD" ? "TBA" : `${s.start_time} - ${s.end_time}`}
+                    </p>
+                    <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                      <DoorOpen size={10}/> {s.other_room_id ? guestRoomName : (r?.room ?? "TBA Room")}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Status Badge */}
+                <div className="lg:text-center w-full lg:w-auto">
+                  <StatusBadge status={s.status} />
+                </div>
+
+                {/* 4. Faculty Info (Admin-Specific) */}
+                <div className="flex items-center gap-3 min-w-0 w-full lg:w-auto">
+                  {isUnassigned ? (
+                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
+                      <Users size={12} />
+                      <span className="text-[10px] font-bold uppercase">Needs Faculty</span>
                     </div>
-                  </div>
-                )}
-
-                {/* Hover Actions */}
-                <div className="flex items-center gap-1 xl:border-l border-gray-100 xl:pl-4 xl:ml-2 opacity-100 xl:opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={()=>onEdit(s)} className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Edit"><Pencil size={14}/></button>
-                  <button onClick={()=>onDelete(s)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Remove"><Trash2 size={14}/></button>
+                  ) : (
+                    <>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-900 truncate">
+                          {isGuest ? guestFacName : getFacultyName(f)}
+                        </p>
+                        <p className="text-[10px] text-gray-500 truncate">
+                          {isGuest ? "External Professor" : f?.personal?.employmentType}
+                        </p>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </div>
 
+                {/* 5. Actions (Admin-Specific) */}
+                <div className="flex items-center justify-end gap-1 w-full lg:w-auto opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button 
+                    onClick={() => onEdit(s)} 
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                    title="Edit Assignment"
+                  >
+                    <Pencil size={15}/>
+                  </button>
+                  <button 
+                    onClick={() => onDelete(s)} 
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                    title="Remove Assignment"
+                  >
+                    <Trash2 size={15}/>
+                  </button>
+                </div>
+
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -889,7 +911,10 @@ export default function ManageSchedule() {
   const [otherFacs, setOtherFacs] = useState<any[]>([]);
   const [otherRooms, setOtherRooms] = useState<any[]>([]);
   const [aiReport, setAiReport] = useState<string | null>(null);
+  const [cachedLoadAdvice, setCachedLoadAdvice] = useState<any[] | null>(null);
   const [isAuditing, setIsAuditing] = useState(false);
+  const [isAdvisorLoading, setIsAdvisorLoading] = useState(false);
+  const [isAdvisorModalOpen, setIsAdvisorModalOpen] = useState(false);
   // Checks if schedules currently exist in the fetched state (disables Generate button)
   const hasExistingSchedules = schedules.length > 0;
 
@@ -1291,6 +1316,136 @@ export default function ManageSchedule() {
     } catch (err) { console.error("Generation failed:", err); alert("Generation failed. Check console."); } finally { setGenerating(false); }
   };
 
+  const handleOpenLoadAdvisor = async () => {
+    // 1. Instantly open the modal so the user feels immediate feedback
+    setIsAdvisorModalOpen(true);
+
+    // 2. If we ALREADY have advice, stop here. Do not call Gemini again.
+    if (cachedLoadAdvice !== null) return;
+
+    // 3. If the buffer is empty, call Gemini to get new advice
+    await generateNewLoadAdvice();
+  };
+
+  const generateNewLoadAdvice = async () => {
+    setIsAdvisorLoading(true);
+    try {
+
+      const facultyRes = await api.get("/manage-schedule/faculty");
+      const freshFaculty = facultyRes.data || [];
+      
+      console.log("[DEBUG] Fresh faculty fetched from API:", {
+      count: freshFaculty.length,
+      firstFaculty: freshFaculty[0],
+      firstFacultyHasPrefs: !!freshFaculty[0]?.preferences
+      });
+
+
+      // 1. Scan current schedules to build context
+      const localConflicts = runConflictScan(schedules);
+
+      console.log("[DEBUG] schedules passed to buildGeminiContext:", {
+        count: schedules.length,
+        firstSchedule: schedules[0]
+      });
+
+      let context = buildGeminiContext(schedules, localConflicts);
+
+      console.log("[DEBUG] context.schedules after buildGeminiContext:", {
+        count: context.schedules.length,
+        firstSchedule: context.schedules[0]
+      });
+      // ✅ DEBUG: What does buildGeminiContext return?
+      console.log("[DEBUG] Raw context from buildGeminiContext:", {
+        facultyCount: context.faculty.length,
+        faculty: context.faculty,  // SEE THE WHOLE FACULTY ARRAY
+        subjectCount: context.subjects.length,
+        scheduleCount: context.schedules.length,
+        conflictCount: context.detectedConflicts.length,
+      });
+  
+      // Populate specializations in the context
+      context = {
+        ...context,
+        faculty: context.faculty.map(f => {
+          const fullFacultyRecord = freshFaculty.find((fac: any) => fac.faculty_id === f.id);
+          const specs = fullFacultyRecord?.faculty_preferences?.subject_specializations || [];
+          // ✅ DEBUG: What specializations are we finding?
+          console.log(`[DEBUG] Faculty ${f.name}:`, {
+            id: f.id,
+            foundInFreshData: !!fullFacultyRecord,
+            specializations: specs,
+          });
+          
+          return {
+            ...f,
+            specializations: specs
+          };
+        })
+      };
+      
+      // ✅ DEBUG: What's the context AFTER adding specializations?
+      console.log("[DEBUG] Context WITH specializations:", {
+        faculty: context.faculty.map(f => ({
+          name: f.name,
+          specializations: f.specializations,
+          assignedUnits: f.assignedUnits,
+          maxUnits: f.maxUnits
+        })),
+        detectedConflicts: context.detectedConflicts
+      });
+      
+      const validationContext: ValidationContext = { 
+        ...context, 
+        allSchedules: schedules, 
+        allFaculty: freshFaculty.map((fac: any) => ({
+        id: fac.faculty_id,
+        personal: {
+          first_name: fac.first_name,    // ✅ snake_case, NOT firstName
+          last_name: fac.last_name,      // ✅ snake_case, NOT lastName
+          employmentType: fac.employment_type
+        }})),
+        allSubjects: SUBJECT_LIST 
+      };
+      
+      // ✅ DEBUG: FACULTY_LIST content
+      console.log("[DEBUG] FACULTY_LIST from imports:", {
+        count: freshFaculty.length,
+        firstFaculty: freshFaculty[0],
+        firstFacultyPrefs: freshFaculty[0]?.preferences
+      });
+      
+      // 2. Query Gemini
+      console.log("[DEBUG] Calling enrichConflictsWithGemini with context:", context);
+      const geminiSuggestions = await enrichConflictsWithGemini(context, validationContext);
+      
+      // ✅ DEBUG: What did Gemini return?
+      console.log("[DEBUG] Gemini returned suggestions:", {
+        count: geminiSuggestions.length,
+        suggestions: geminiSuggestions
+      });
+      
+      // 3. Filter only the load advice
+      const adviceOnly = geminiSuggestions.filter((s: any) => 
+        s.conflictId.startsWith('load-advice-')
+      );
+      
+      // ✅ DEBUG: After filtering
+      console.log("[DEBUG] Load advice suggestions after filter:", {
+        count: adviceOnly.length,
+        advice: adviceOnly
+      });
+  
+      setCachedLoadAdvice(adviceOnly);
+    } catch (error) {
+      console.error("Failed to fetch load advice", error);
+      setCachedLoadAdvice([]); 
+    } finally {
+      setIsAdvisorLoading(false);
+    }
+  };
+
+
   const handleSetupSections = async (counts: any) => {
     try {
       await api.post("/manage-schedule/curriculums/setup-sections", {
@@ -1459,8 +1614,11 @@ export default function ManageSchedule() {
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-colors ${aiReport ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border border-indigo-300" : "bg-indigo-600 hover:bg-indigo-700 text-white"}`}>
               <Sparkles size={14}/> {isAuditing ? "Auditing..." : aiReport ? "View AI Audit" : "AI Schedule Audit"}
             </button>
-            <button onClick={() => runScan()} disabled={scanning} className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold shadow-md shadow-violet-200 transition-colors">
-              <Users size={14}/> {scanning ? "Scanning..." : "AI Load Advisor"}
+            <button 
+              onClick={handleOpenLoadAdvisor} 
+              disabled={isAdvisorLoading} 
+              className="flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs font-bold shadow-md shadow-violet-200 transition-colors">
+              <Users size={14}/> {isAdvisorLoading ? "Loading Advisor..." : "AI Load Advisor"}
             </button>
           </div>
         </div>
@@ -1592,6 +1750,75 @@ export default function ManageSchedule() {
       {modal==="scan" && <ConflictScanModal initialConflicts={conflicts} onApplyFix={handleApplyFix} onApplyTransfers={handleApplyTransfers} onClose={closeModal} onFinalize={handleFinalize}/>}
       {modal==="fixResults" && fixResults && <AutoFixResultsModal data={fixResults} onClose={closeModal}/>}
       {modal==="setup" && <SetupSectionsModal onClose={closeModal} activeSem={activeSem} onSave={handleSetupSections}/>}
+
+      {isAdvisorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl font-lexend">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-violet-50">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-violet-600"/>
+                <h3 className="text-base font-bold text-violet-900">AI Faculty Load Advisor</h3>
+              </div>
+              <button 
+                onClick={() => setIsAdvisorModalOpen(false)}
+                className="w-8 h-8 rounded-lg bg-violet-100/50 flex items-center justify-center text-violet-600 hover:bg-violet-200 transition-colors"
+              >
+                <X size={16}/>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-6 py-5 overflow-y-auto flex-grow bg-white">
+              {isAdvisorLoading ? (
+                <div className="flex flex-col items-center justify-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600 mb-4"></div>
+                  <p className="text-sm font-semibold text-violet-600">Analyzing faculty workloads...</p>
+                </div>
+              ) : cachedLoadAdvice && cachedLoadAdvice.length > 0 ? (
+                <div className="space-y-3">
+                  {cachedLoadAdvice.map((advice, index) => (
+                    <div key={index} className="p-4 bg-violet-50/50 border border-violet-100 rounded-xl">
+                      <p className="text-sm font-bold text-violet-900 mb-1.5">{advice.summaryNote}</p>
+                      <p className="text-xs text-violet-800 leading-relaxed">{advice.suggestion}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center py-10 gap-3 bg-green-50 border border-green-100 rounded-xl">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600">
+                    <CheckCircle2 size={24}/>
+                  </div>
+                  <div className="text-center">
+                    <p className="font-bold text-green-900 text-base">Load is Balanced!</p>
+                    <p className="text-sm text-green-700 mt-1">No cross-specialization transfers required at this time.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-between bg-gray-50 items-center">
+              <button 
+                onClick={generateNewLoadAdvice}
+                disabled={isAdvisorLoading}
+                className="text-xs text-violet-600 hover:text-violet-800 font-bold disabled:opacity-50 flex items-center gap-1"
+              >
+                🔄 Recalculate Advice
+              </button>
+              <button 
+                onClick={() => setIsAdvisorModalOpen(false)}
+                className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-colors"
+              >
+                Close Window
+              </button>
+            </div>
+            
+          </div>
+        </div>
+      )}
+
     </div>
     </AdminLayout>
   );
