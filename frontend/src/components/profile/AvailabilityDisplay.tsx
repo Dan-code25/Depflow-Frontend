@@ -172,9 +172,7 @@ export default function AvailabilityDisplay({
                   key={idx}
                   className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg"
                 >
-                  <span className="text-slate-700 font-medium">
-                    {slot}
-                  </span>
+                  <span className="text-slate-700 font-medium">{slot}</span>
                   <div className="w-2 h-2 bg-burgundy rounded-full"></div>
                 </div>
               ))}

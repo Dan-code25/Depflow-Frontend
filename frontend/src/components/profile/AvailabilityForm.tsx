@@ -12,9 +12,7 @@ interface TimeSlotDisplay {
 
 interface AvailabilityFormProps {
   availability?: Availability | null;
-  onSave: (
-    availability: Omit<Availability, "createdAt" | "updatedAt">,
-  ) => void;
+  onSave: (availability: Omit<Availability, "createdAt" | "updatedAt">) => void;
   isLoading?: boolean;
 }
 
@@ -91,9 +89,7 @@ export default function AvailabilityForm({
   const handleSubjectToggle = (subjectId: string) => {
     setFormData((prev) => ({
       ...prev,
-      subjectSpecializations: prev.subjectSpecializations.includes(
-        subjectId,
-      )
+      subjectSpecializations: prev.subjectSpecializations.includes(subjectId)
         ? prev.subjectSpecializations.filter((s) => s !== subjectId)
         : [...prev.subjectSpecializations, subjectId],
     }));
@@ -203,7 +199,9 @@ export default function AvailabilityForm({
       unavailableTimeSlots: formData.unavailableTimeSlots.map(
         (slot) => `${slot.startTime}-${slot.endTime}`,
       ),
-      preferredRoomTypes: formData.preferredRoomTypes.map((rt) => rt.toLowerCase()),
+      preferredRoomTypes: formData.preferredRoomTypes.map((rt) =>
+        rt.toLowerCase(),
+      ),
     };
 
     try {
@@ -273,7 +271,7 @@ export default function AvailabilityForm({
           <label className="text-xs font-bold text-slate-500 uppercase block mb-3">
             Subjects You Can Teach
           </label>
-          
+
           {subjectsLoading ? (
             <p className="text-sm text-slate-500">Loading subjects...</p>
           ) : subjects.length > 0 ? (
@@ -303,9 +301,7 @@ export default function AvailabilityForm({
                             setSearchQuery("");
                           }}
                           className={`w-full text-left px-4 py-3 transition flex items-center gap-3 hover:bg-burgundy/5 ${
-                            formData.subjectSpecializations.includes(
-                              subject.id,
-                            )
+                            formData.subjectSpecializations.includes(subject.id)
                               ? "bg-burgundy/10 border-l-2 border-burgundy"
                               : ""
                           }`}
@@ -461,7 +457,10 @@ export default function AvailabilityForm({
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {DAYS_OF_WEEK.map((day) => (
-              <label key={day} className="flex items-center gap-2 cursor-pointer">
+              <label
+                key={day}
+                className="flex items-center gap-2 cursor-pointer"
+              >
                 <input
                   type="checkbox"
                   checked={formData.preferredDays.includes(day)}
@@ -481,7 +480,10 @@ export default function AvailabilityForm({
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {DAYS_OF_WEEK.map((day) => (
-              <label key={day} className="flex items-center gap-2 cursor-pointer">
+              <label
+                key={day}
+                className="flex items-center gap-2 cursor-pointer"
+              >
                 <input
                   type="checkbox"
                   checked={formData.unavailableDays.includes(day)}
