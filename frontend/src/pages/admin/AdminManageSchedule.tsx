@@ -1073,11 +1073,6 @@ export default function ManageSchedule() {
   const closeModal = () => { setModal(null); setSelected(null); };
 
   const handleSave = async (entry: any, customFacName?: string, customRoomName?: string) => {
-    console.log("DEBUG [handleSave Start]: Entry state from Modal:", {
-    facId: entry.faculty_id,
-    otherFacId: entry.other_faculty_id,
-    customName: customFacName
-    });
     try {
       // 1. Initialize logic variables
       let finalFacId: string | null = entry.faculty_id;
@@ -1107,8 +1102,6 @@ export default function ManageSchedule() {
         const normalizedName = customFacName.trim().replace(/\b\w/g, c => c.toUpperCase());
         const fRes = await api.post("/manage-schedule/other-faculty", { name: normalizedName });
         
-        console.log("DEBUG [Save]: other-faculty response:", fRes.data);
-        
         // Bulletproof fallback to catch the ID no matter what the backend calls it
         finalOtherFacId = fRes.data.id || fRes.data.other_faculty_id || null;
         finalFacId = null;
@@ -1120,8 +1113,6 @@ export default function ManageSchedule() {
       if (finalRoomId === "OTHER" && customRoomName) {
         const normalizedRoom = customRoomName.trim().toUpperCase();
         const rRes = await api.post("/manage-schedule/other-rooms", { name: normalizedRoom });
-        
-        console.log("DEBUG [Save]: other-rooms response:", rRes.data);
         
         finalOtherRoomId = rRes.data.id || rRes.data.other_room_id || null;
         finalRoomId = null; 
@@ -1156,8 +1147,6 @@ export default function ManageSchedule() {
         semester:         activeSem.sem
       };
 
-      // 🚨 FINAL PAYLOAD LOG
-      console.log("DEBUG [handleSave Final]: Payload being sent to DB:", payload);
 
       // 6. EXECUTE SAVE
       if (modal === "edit") { 
@@ -1333,67 +1322,23 @@ export default function ManageSchedule() {
 
       const facultyRes = await api.get("/manage-schedule/faculty");
       const freshFaculty = facultyRes.data || [];
-      
-      console.log("[DEBUG] Fresh faculty fetched from API:", {
-      count: freshFaculty.length,
-      firstFaculty: freshFaculty[0],
-      firstFacultyHasPrefs: !!freshFaculty[0]?.preferences
-      });
-
 
       // 1. Scan current schedules to build context
       const localConflicts = runConflictScan(schedules);
 
-      console.log("[DEBUG] schedules passed to buildGeminiContext:", {
-        count: schedules.length,
-        firstSchedule: schedules[0]
-      });
-
       let context = buildGeminiContext(schedules, localConflicts);
 
-      console.log("[DEBUG] context.schedules after buildGeminiContext:", {
-        count: context.schedules.length,
-        firstSchedule: context.schedules[0]
-      });
-      // ✅ DEBUG: What does buildGeminiContext return?
-      console.log("[DEBUG] Raw context from buildGeminiContext:", {
-        facultyCount: context.faculty.length,
-        faculty: context.faculty,  // SEE THE WHOLE FACULTY ARRAY
-        subjectCount: context.subjects.length,
-        scheduleCount: context.schedules.length,
-        conflictCount: context.detectedConflicts.length,
-      });
-  
-      // Populate specializations in the context
       context = {
         ...context,
         faculty: context.faculty.map(f => {
           const fullFacultyRecord = freshFaculty.find((fac: any) => fac.faculty_id === f.id);
-          const specs = fullFacultyRecord?.faculty_preferences?.subject_specializations || [];
-          // ✅ DEBUG: What specializations are we finding?
-          console.log(`[DEBUG] Faculty ${f.name}:`, {
-            id: f.id,
-            foundInFreshData: !!fullFacultyRecord,
-            specializations: specs,
-          });
-          
+          const specs = fullFacultyRecord?.faculty_preferences?.subject_specializations || []; 
           return {
             ...f,
             specializations: specs
           };
         })
       };
-      
-      // ✅ DEBUG: What's the context AFTER adding specializations?
-      console.log("[DEBUG] Context WITH specializations:", {
-        faculty: context.faculty.map(f => ({
-          name: f.name,
-          specializations: f.specializations,
-          assignedUnits: f.assignedUnits,
-          maxUnits: f.maxUnits
-        })),
-        detectedConflicts: context.detectedConflicts
-      });
       
       const validationContext: ValidationContext = { 
         ...context, 
@@ -1408,33 +1353,13 @@ export default function ManageSchedule() {
         allSubjects: SUBJECT_LIST 
       };
       
-      // ✅ DEBUG: FACULTY_LIST content
-      console.log("[DEBUG] FACULTY_LIST from imports:", {
-        count: freshFaculty.length,
-        firstFaculty: freshFaculty[0],
-        firstFacultyPrefs: freshFaculty[0]?.preferences
-      });
-      
-      // 2. Query Gemini
-      console.log("[DEBUG] Calling enrichConflictsWithGemini with context:", context);
-      const geminiSuggestions = await enrichConflictsWithGemini(context, validationContext);
-      
-      // ✅ DEBUG: What did Gemini return?
-      console.log("[DEBUG] Gemini returned suggestions:", {
-        count: geminiSuggestions.length,
-        suggestions: geminiSuggestions
-      });
+      const geminiSuggestions = await enrichConflictsWithGemini(context, validationContext)
+    
       
       // 3. Filter only the load advice
       const adviceOnly = geminiSuggestions.filter((s: any) => 
         s.conflictId.startsWith('load-advice-')
       );
-      
-      // ✅ DEBUG: After filtering
-      console.log("[DEBUG] Load advice suggestions after filter:", {
-        count: adviceOnly.length,
-        advice: adviceOnly
-      });
   
       setCachedLoadAdvice(adviceOnly);
     } catch (error) {

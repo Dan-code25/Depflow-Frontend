@@ -92,15 +92,6 @@ export async function enrichConflictsWithGemini(
   validationContext?: ValidationContext
 ): Promise<GeminiConflictSuggestion[]> {
 
-  console.log("[DEBUG] enrichConflictsWithGemini called with:", {
-    facultyCount: context.faculty.length,
-    faculty: context.faculty,
-    detectedConflictCount: context.detectedConflicts.length,
-    detectedConflicts: context.detectedConflicts
-  });
- 
-
-
   // Pre-filter: remove conflict types that Gemini should never touch because
   // they are either auto-fixed by the local engine or are valid by exception.
   // Passing them to Gemini risks getting back incorrect "suggestions".
@@ -122,25 +113,12 @@ export async function enrichConflictsWithGemini(
     return true;
   });
 
-    console.log("[DEBUG] After filtering conflicts:", {
-    beforeFilterCount: context.detectedConflicts.length,
-    afterFilterCount: filteredConflicts.length,
-    filteredConflicts: filteredConflicts
-  });
-
-  // Nothing left to enrich after filtering
-  if (filteredConflicts.length === 0) {
-    console.log("[DeptFlow] Load Advisor: No hard conflicts. Focusing entirely on proactive load balancing...");
-  }
-
   const enrichContext: GeminiScheduleContext = {
     ...context,
     detectedConflicts: filteredConflicts,
   };
 
   const prompt = buildPrompt(enrichContext);
-
-  console.log("[DEBUG] About to call Gemini API with context:", enrichContext);
 
   const response = await fetch(GEMINI_API_URL, {
     method: "POST",
@@ -158,48 +136,16 @@ export async function enrichConflictsWithGemini(
     }),
   });
 
-  if (!response.ok) {
-    const err = await response.text();
-      console.error("[DEBUG] Gemini API error response:", {
-      status: response.status,
-      error: err
-    });
-    throw new Error(`Gemini API error ${response.status}: ${err}`);
-  }
 
   const data = await response.json();
   const rawText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
-  console.log("🤖 RAW GEMINI JSON OUTPUT 🤖\n", rawText);
-
-  console.log("[DEBUG] Full Gemini response data:", {
-    hasData: !!data,
-    hasCandidate: !!data?.candidates?.[0],
-    hasContent: !!data?.candidates?.[0]?.content,
-    parts: data?.candidates?.[0]?.content?.parts,
-    rawText: rawText
-  });
-
-
-  if (!rawText) {
-    console.warn("[DeptFlow] Gemini returned an empty response.");
-    return [];
-  }
-
   const suggestions = parseGeminiResponse(rawText);
 
-    console.log("[DEBUG] Parsed suggestions:", {
-    count: suggestions.length,
-    suggestions: suggestions
-  });
 
   // ── NEW: Pre-flight validation (Phase 2) ────────────────────────────────
   if (validationContext) {
     const validated = suggestions.filter(sugg => validateSuggestion(sugg, validationContext));
-    console.log(
-      `[DeptFlow] Validated ${validated.length}/${suggestions.length} suggestions ` +
-      `(filtered ${suggestions.length - validated.length} invalid ones)`
-    );
     return validated;
   }
 
@@ -211,32 +157,10 @@ export async function enrichConflictsWithGemini(
 
 function buildPrompt(ctx: GeminiScheduleContext): string {
   // Extract only the entry IDs referenced in conflicts
-  
-  console.log("[DEBUG] buildPrompt received context:", {
-    facultyCount: ctx.faculty.length,
-    faculty: ctx.faculty.map(f => ({
-      name: f.name,
-      assignedUnits: f.assignedUnits,
-      maxUnits: f.maxUnits,
-      specializations: f.specializations
-    })),
-    subjectCount: ctx.subjects.length,
-    scheduleCount: ctx.schedules.length,
-    conflictCount: ctx.detectedConflicts.length
-  });
-
-  console.log("[DEBUG] First schedule ID:", ctx.schedules[0]?.id);
-
   const relevantSchedules = ctx.schedules;
-
-
-  console.log("[DEBUG] relevantSchedules after filter:", relevantSchedules.length);
-
   const facultyList = ctx.faculty
     .map(f => `${f.name}(${f.employmentType},${f.assignedUnits}/${f.maxUnits}u)`)
     .join(", ");
-
-  console.log("[DEBUG] facultyList string for prompt:", facultyList);
 
   const scheduleList = relevantSchedules
     .map(s => {
@@ -245,27 +169,20 @@ function buildPrompt(ctx: GeminiScheduleContext): string {
       return `[${s.id}]${s.subjectCode}${labTag}|${s.facultyName}|${s.section}|${s.room}|${s.day} ${s.startTime}-${s.endTime}`;
     })
     .join("\n");
-  console.log("[DEBUG] scheduleList for prompt:\n", scheduleList);
-  console.log("[DEBUG] relevantSchedules:", {
-    count: relevantSchedules.length,
-    firstSchedule: relevantSchedules[0],
-    allSchedules: ctx.schedules.length
-  });
+
   const subjectLegend = ctx.subjects
     .filter(s => relevantSchedules.some(r => r.subjectCode === s.code))
     .map(s => `${s.code}(${s.units}u,${s.facilityType ?? "lecture"})`)
     .join(", ");
 
-  console.log("[DEBUG] subjectLegend:", subjectLegend);
   const facultySpecializationList = ctx.faculty
     .map(f => {
     const specs = f.specializations || [];
     return `${f.name} (${f.employmentType}, ${f.assignedUnits}/${f.maxUnits}u): [${specs.join(", ")}]`;
     })
     .join("\n");
-   console.log("[DEBUG] facultySpecializationList:\n", facultySpecializationList);
 
-   const facultyTeachingMap = new Map<string, Set<string>>();
+  const facultyTeachingMap = new Map<string, Set<string>>();
     ctx.schedules.forEach(s => {
       if (!facultyTeachingMap.has(s.facultyName)) {
         facultyTeachingMap.set(s.facultyName, new Set());
@@ -273,18 +190,11 @@ function buildPrompt(ctx: GeminiScheduleContext): string {
       facultyTeachingMap.get(s.facultyName)!.add(s.subjectCode);
     });
 
-    const currentlyAssignedSubjects = Array.from(facultyTeachingMap.entries())
-      .map(([facultyName, subjects]) => `${facultyName}: [${Array.from(subjects).join(", ")}]`)
-      .join("\n");
+  const currentlyAssignedSubjects = Array.from(facultyTeachingMap.entries())
+    .map(([facultyName, subjects]) => `${facultyName}: [${Array.from(subjects).join(", ")}]`)
+    .join("\n");
 
-    const conflictList = ctx.detectedConflicts
-      .map(c => `conflictId:"${c.id}"|${c.type}|"${c.label}": ${c.message}`)
-      .join("\n");
  
-  // ✅ DEBUG: Conflict list
-  console.log("[DEBUG] conflictList:\n", conflictList);
-  console.log("[DEBUG] conflictList length:", ctx.detectedConflicts.length);
-
   // ── PHASE 3: NEW FOCUSED PROMPT ────────────────────────────────────────
   const finalPrompt = `
     You are the Master AI Load Advisor for a University Department at TUP.
@@ -448,7 +358,6 @@ function buildPrompt(ctx: GeminiScheduleContext): string {
     EXPECTED: 10-15 suggestions if multiple valid transfers exist
     DO NOT output fewer than 5 suggestions.
     ═══════════════════════════════════════════════════════════════════════════════`;
-  console.log("[DEBUG] FINAL PROMPT BEING SENT TO GEMINI:\n", finalPrompt);
   return finalPrompt.trim();
 }
 
