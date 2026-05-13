@@ -661,14 +661,26 @@ function AutoFixResultsModal({ data, onClose }: {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ListView({ data, otherFacs = [], otherRooms = [], onEdit, onDelete }: any) {
+  // Helper to convert 24hr string (07:00) to 12hr with AM/PM (7:00 AM)
+  const formatTime12h = (timeStr: string) => {
+    if (!timeStr || timeStr === "TBD") return "TBA";
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const hour12 = hours % 12 || 12;
+    return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  };
+
   return (
     <div className="w-full bg-white border border-gray-100 rounded-2xl overflow-hidden font-lexend shadow-sm">
-      {/* ── Table-style Header (Large Screens Only) ── */}
-      <div className="hidden lg:grid grid-cols-[1.2fr_1.5fr_1fr_1.5fr_1fr] gap-4 px-6 py-4 bg-gray-50 border-b border-gray-100">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subject & Section</span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Schedule & Room</span>
+      {/* ── Table-style Header (8 Columns) ── */}
+      <div className="hidden lg:grid grid-cols-[0.8fr_0.6fr_0.5fr_1.4fr_0.8fr_0.7fr_1.3fr_0.8fr] gap-4 px-6 py-4 bg-gray-50 border-b border-gray-100">
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Code</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Section</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Day</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Time (AM/PM)</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Room</span>
         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Status</span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Faculty Member</span>
+        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Faculty</span>
         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Actions</span>
       </div>
 
@@ -686,76 +698,68 @@ function ListView({ data, otherFacs = [], otherRooms = [], onEdit, onDelete }: a
 
           return (
             <div key={s.schedule_id} className="group hover:bg-gray-50/50 transition-colors relative">
-              {/* Left Accent Border on Hover */}
               <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#8B0000] opacity-0 group-hover:opacity-100 transition-opacity" />
 
-              <div className="lg:grid lg:grid-cols-[1.2fr_1.5fr_1fr_1.5fr_1fr] flex flex-col gap-4 px-6 py-5 items-start lg:items-center">
+              <div className="lg:grid lg:grid-cols-[0.8fr_0.6fr_0.5fr_1.4fr_0.8fr_0.7fr_1.3fr_0.8fr] flex flex-col gap-4 px-6 py-5 items-start lg:items-center">
                 
-                {/* 1. Subject & Section */}
+                {/* 1. Subject Code */}
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-black text-gray-900">{sub?.code}</p>
-                    <span className="px-1.5 py-0.5 bg-gray-100 text-[10px] font-bold text-gray-500 rounded uppercase">{s.section}</span>
-                  </div>
-                  <p className="text-[11px] text-gray-400 truncate max-w-[180px]">{sub?.name}</p>
+                  <p className="text-sm font-black text-gray-900">{sub?.code}</p>
                 </div>
 
-                {/* 2. Schedule & Room */}
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#FFF3F3] rounded-lg text-[#8B0000] shrink-0">
-                    <Clock size={14} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-gray-800">
-                      {s.day === "TBD" ? "TBA" : s.day} • {s.start_time === "TBD" ? "TBA" : `${s.start_time} - ${s.end_time}`}
-                    </p>
-                    <p className="text-[10px] text-gray-500 flex items-center gap-1">
-                      <DoorOpen size={10}/> {s.other_room_id ? guestRoomName : (r?.room ?? "TBA Room")}
-                    </p>
-                  </div>
+                {/* 2. Section (Now same font style as Code) */}
+                <div className="min-w-0">
+                   <p className="text-xs font-bold text-gray-800 uppercase">{s.section}</p>
                 </div>
 
-                {/* 3. Status Badge */}
+                {/* 3. Day */}
+                <div className="text-xs font-bold text-gray-700">
+                  {s.day === "TBD" ? <span className="text-amber-500 italic">TBA</span> : s.day}
+                </div>
+
+                {/* 4. Time (AM/PM) */}
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-bold text-gray-800 uppercase">
+                    {s.start_time === "TBD" ? 
+                      <span className="text-amber-500 italic">TBA</span> : 
+                      `${formatTime12h(s.start_time)} - ${formatTime12h(s.end_time)}`
+                    }
+                  </p>
+                </div>
+
+                {/* 5. Room */}
+                <div className="text-xs font-bold text-gray-800 truncate">
+                  {s.other_room_id ? guestRoomName : (r?.room ?? <span className="text-amber-500 italic">TBA</span>)}
+                </div>
+
+                {/* 6. Status Badge */}
                 <div className="lg:text-center w-full lg:w-auto">
                   <StatusBadge status={s.status} />
                 </div>
 
-                {/* 4. Faculty Info (Admin-Specific) */}
+                {/* 7. Faculty Member */}
                 <div className="flex items-center gap-3 min-w-0 w-full lg:w-auto">
                   {isUnassigned ? (
                     <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
                       <Users size={12} />
-                      <span className="text-[10px] font-bold uppercase">Needs Faculty</span>
+                      <span className="text-[10px] font-bold uppercase tracking-tighter">Unassigned</span>
                     </div>
                   ) : (
-                    <>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-gray-900 truncate">
-                          {isGuest ? guestFacName : getFacultyName(f)}
-                        </p>
-                        <p className="text-[10px] text-gray-500 truncate">
-                          {isGuest ? "External Professor" : f?.personal?.employmentType}
-                        </p>
-                      </div>
-                    </>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-900 truncate">
+                        {isGuest ? guestFacName : getFacultyName(f)}
+                      </p>
+                    </div>
                   )}
                 </div>
 
-                {/* 5. Actions (Admin-Specific) */}
+                {/* 8. Actions */}
                 <div className="flex items-center justify-end gap-1 w-full lg:w-auto opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button 
-                    onClick={() => onEdit(s)} 
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                    title="Edit Assignment"
-                  >
-                    <Pencil size={15}/>
+                  <button onClick={() => onEdit(s)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
+                    <Pencil size={14}/>
                   </button>
-                  <button 
-                    onClick={() => onDelete(s)} 
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                    title="Remove Assignment"
-                  >
-                    <Trash2 size={15}/>
+                  <button onClick={() => onDelete(s)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                    <Trash2 size={14}/>
                   </button>
                 </div>
 
@@ -899,6 +903,7 @@ export default function ManageSchedule() {
   const [conflicts,      setConflicts]      = useState<Conflict[]>([]);
   const [scanning,       setScanning]       = useState(false);
   const [_scanned,       setScanned]        = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const unresolvedItems = useMemo(() => {
   return schedules.filter(s => {
     if (isExternalSubject(s.subject_id)) return false; // Ignore GE/PE/NSTP
@@ -917,7 +922,7 @@ export default function ManageSchedule() {
   const [isAdvisorModalOpen, setIsAdvisorModalOpen] = useState(false);
   // Checks if schedules currently exist in the fetched state (disables Generate button)
   const hasExistingSchedules = schedules.length > 0;
-
+  const ITEMS_PER_PAGE = 10;
   const formattedSY = parseInt(
     (activeSem.schoolYear.split("-")[0]?.slice(-2) || "") + 
     (activeSem.schoolYear.split("-")[1]?.slice(-2) || "")
@@ -932,6 +937,7 @@ export default function ManageSchedule() {
   );
 
   useEffect(() => {
+    setCurrentPage(1);
     const loadData = async () => {
       try {
         const params = { schoolYear: activeSem.schoolYear, sem: activeSem.sem };
@@ -1021,7 +1027,7 @@ export default function ManageSchedule() {
       } catch (error) { console.error("Failed to load database records:", error); }
     };
     loadData();
-  }, [activeSem.schoolYear, activeSem.sem]);
+  }, [search, filterDay, filterFac, filterProgram, filterRoom, filterStatus, activeSem.schoolYear, activeSem.sem]);
 
   const drafts    = schedules.filter(s=>s.status==="draft").length;
   const finalized = schedules.filter(s=>s.status==="finalized").length;
@@ -1072,6 +1078,37 @@ export default function ManageSchedule() {
   const openDelete = (s:ScheduleAssignment) => { setSelected(s); setModal("delete"); };
   const closeModal = () => { setModal(null); setSelected(null); };
 
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedData = useMemo(() => {
+  const start = (currentPage - 1) * ITEMS_PER_PAGE;
+  return filtered.slice(start, start + ITEMS_PER_PAGE);
+  }, [filtered, currentPage]);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 4) {
+        for (let i = 1; i <= 5; i++) pages.push(i);
+        pages.push("...");
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 3) {
+        pages.push(1);
+        pages.push("...");
+        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push("...");
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push("...");
+        pages.push(totalPages);
+      }
+    }
+    return pages;
+  };
   const handleSave = async (entry: any, customFacName?: string, customRoomName?: string) => {
     try {
       // 1. Initialize logic variables
@@ -1657,14 +1694,64 @@ export default function ManageSchedule() {
             </div>
           </div>
           
-          <p className="text-xs text-gray-500 px-1">Showing <span className="font-bold text-gray-800">{filtered.length}</span> of {schedules.length} assignments</p>
+          <p className="text-xs text-gray-500 px-1">
+            Showing <span className="font-bold text-gray-800">
+              {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filtered.length)} - {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)}
+            </span> of {filtered.length} assignments
+          </p>
           
           {filtered.length === 0 ? (
-            <div className="bg-white border border-gray-100 rounded-2xl p-16 text-center text-gray-400"><CalendarDays size={36} className="mx-auto mb-3 opacity-30"/><p className="text-sm">No assignments found.</p></div>
+            <div className="bg-white border border-gray-100 rounded-2xl p-16 text-center text-gray-400">
+              <CalendarDays size={36} className="mx-auto mb-3 opacity-30"/><p className="text-sm">No assignments found.</p>
+            </div>
           ) : (
-            <>{view === "list" && <ListView data={filtered} otherFacs={otherFacs} otherRooms={otherRooms} onEdit={openEdit} onDelete={openDelete}/>}
+            <>
+            {view === "list" && <ListView data={paginatedData} otherFacs={otherFacs} otherRooms={otherRooms} onEdit={openEdit} onDelete={openDelete}/>}
             {view === "timetable" && <TimetableView data={filtered} otherFacs={otherFacs} otherRooms={otherRooms} onEdit={openEdit} onDelete={openDelete}/>}</>
           )}
+          {/* 2. Compact Pagination UI */}
+            {totalPages > 1 && view === "list" && (
+              <div className="flex items-center justify-between px-2 pt-2 pb-8">
+                <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                  Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filtered.length)}-{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
+                </p>
+                
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 text-gray-400 hover:text-burgundy disabled:opacity-30 transition-colors">
+                    Previous
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {getPageNumbers().map((num, i) => (
+                      <button
+                        key={i}
+                        onClick={() => typeof num === 'number' && setCurrentPage(num)}
+                        disabled={num === "..."}
+                        className={`min-w-[36px] h-9 rounded-lg text-xs font-bold transition-all ${
+                          currentPage === num 
+                            ? "bg-[#8B0000] text-white shadow-md shadow-[#8B0000]/20" 
+                            : num === "..." 
+                              ? "text-gray-300 cursor-default" 
+                              : "text-gray-500 hover:bg-gray-100"
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 text-gray-400 hover:text-burgundy disabled:opacity-30 transition-colors">
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
         </div>
         <LoadMonitorPanel sched={schedules}/>
       </div>
@@ -1748,4 +1835,3 @@ export default function ManageSchedule() {
     </AdminLayout>
   );
 }
-
