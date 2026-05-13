@@ -4,6 +4,7 @@ import type { Availability } from "../../types/profile";
 import { getSubjects } from "../../services/availabilityService";
 import { DAYS_OF_WEEK } from "../../utils/availabilityConstants";
 import type { Subject } from "../../utils/availabilityConstants";
+import { ConfirmDialog } from "../common/ConfirmDialog";
 
 interface TimeSlotDisplay {
   startTime: string;
@@ -26,6 +27,10 @@ export default function AvailabilityForm({
   const [searchQuery, setSearchQuery] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingAvailabilityData, setPendingAvailabilityData] = useState<
+    Omit<Availability, "createdAt" | "updatedAt"> | null
+  >(null);
 
   const [formData, setFormData] = useState<{
     facultyId: string;
@@ -193,7 +198,6 @@ export default function AvailabilityForm({
       return;
     }
 
-    setIsSaving(true);
     const availabilityData: Omit<Availability, "createdAt" | "updatedAt"> = {
       ...formData,
       unavailableTimeSlots: formData.unavailableTimeSlots.map(
@@ -204,8 +208,18 @@ export default function AvailabilityForm({
       ),
     };
 
+    setPendingAvailabilityData(availabilityData);
+    setShowConfirmDialog(true);
+  };
+
+  const confirmSave = () => {
+    if (!pendingAvailabilityData) return;
+
+    setIsSaving(true);
     try {
-      onSave(availabilityData);
+      onSave(pendingAvailabilityData);
+      setShowConfirmDialog(false);
+      setPendingAvailabilityData(null);
     } finally {
       setIsSaving(false);
     }
@@ -231,7 +245,22 @@ export default function AvailabilityForm({
   const roomTypes = ["Lecture", "Lab"];
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 p-6 sm:p-8">
+    <>
+      <ConfirmDialog
+        isOpen={showConfirmDialog}
+        title={availability ? "Update Availability" : "Create Availability"}
+        message="Please confirm that you want to save your teaching availability settings."
+        confirmText="Save"
+        cancelText="Cancel"
+        isLoading={isSaving}
+        onConfirm={confirmSave}
+        onCancel={() => {
+          setShowConfirmDialog(false);
+          setPendingAvailabilityData(null);
+        }}
+      />
+
+      <div className="bg-white rounded-lg border border-slate-200 p-6 sm:p-8">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xs sm:text-sm font-bold text-burgundy uppercase">
           {availability ? "Edit" : "Set"} Teaching Availability
@@ -587,5 +616,6 @@ export default function AvailabilityForm({
         </div>
       </form>
     </div>
+    </>
   );
 }
