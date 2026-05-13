@@ -54,7 +54,6 @@ export default function AvailabilityTab({
     <AvailabilityForm
       availability={availability}
       onSave={onSave}
-      onDelete={onDelete}
       isLoading={isLoading}
     />
   );

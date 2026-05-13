@@ -26,7 +26,24 @@ export const getSubjects = async (): Promise<Subject[]> => {
 export const getAvailability = async (): Promise<Availability | null> => {
   try {
     const response = await api.get("/availability/get");
-    return response.data || null;
+    console.log("Fetched availability:", response.data);
+    if (!response.data) return null;
+    // Ensure proper format from backend
+    return {
+      facultyId: response.data.facultyId || "",
+      priority: response.data.priority || "medium",
+      maxClassesPerDay: response.data.maxClassesPerDay || 3,
+      maxConsecutiveHours: response.data.maxConsecutiveHours || 4,
+      timeStart: response.data.timeStart || "07:00",
+      timeEnd: response.data.timeEnd || "19:00",
+      preferredDays: response.data.preferredDays || [],
+      unavailableDays: response.data.unavailableDays || [],
+      preferredRoomTypes: response.data.preferredRoomTypes || [],
+      unavailableTimeSlots: response.data.unavailableTimeSlots || [],
+      subjectSpecializations: response.data.subjectSpecializations || [],
+      createdAt: response.data.createdAt,
+      updatedAt: response.data.updatedAt,
+    };
   } catch (error) {
     console.error("Error fetching availability:", error);
     return null;
@@ -37,11 +54,26 @@ export const getAvailability = async (): Promise<Availability | null> => {
  * Save or update availability (single form)
  */
 export const saveAvailability = async (
-  availability: Omit<Availability, "id" | "createdAt" | "updatedAt">,
+  availability: Omit<Availability, "createdAt" | "updatedAt">,
 ): Promise<Availability> => {
   try {
     const response = await api.post("/availability/save", availability);
-    return response.data;
+    if (!response.data) throw new Error("No response data");
+    return {
+      facultyId: response.data.facultyId || "",
+      priority: response.data.priority || "medium",
+      maxClassesPerDay: response.data.maxClassesPerDay || 3,
+      maxConsecutiveHours: response.data.maxConsecutiveHours || 4,
+      timeStart: response.data.timeStart || "07:00",
+      timeEnd: response.data.timeEnd || "19:00",
+      preferredDays: response.data.preferredDays || [],
+      unavailableDays: response.data.unavailableDays || [],
+      preferredRoomTypes: response.data.preferredRoomTypes || [],
+      unavailableTimeSlots: response.data.unavailableTimeSlots || [],
+      subjectSpecializations: response.data.subjectSpecializations || [],
+      createdAt: response.data.createdAt,
+      updatedAt: response.data.updatedAt,
+    };
   } catch (error) {
     console.error("Error saving availability:", error);
     throw error;
@@ -70,7 +102,23 @@ export const getFacultyAvailability = async (
     const response = await api.get(
       `/faculty/availability/faculty/${facultyId}`,
     );
-    return response.data || null;
+    console.log("Fetched faculty availability:", response.data);
+    if (!response.data) return null;
+    return {
+      facultyId: response.data.facultyId || "",
+      priority: response.data.priority || "medium",
+      maxClassesPerDay: response.data.maxClassesPerDay || 3,
+      maxConsecutiveHours: response.data.maxConsecutiveHours || 4,
+      timeStart: response.data.timeStart || "07:00",
+      timeEnd: response.data.timeEnd || "19:00",
+      preferredDays: response.data.preferredDays || [],
+      unavailableDays: response.data.unavailableDays || [],
+      preferredRoomTypes: response.data.preferredRoomTypes || [],
+      unavailableTimeSlots: response.data.unavailableTimeSlots || [],
+      subjectSpecializations: response.data.subjectSpecializations || [],
+      createdAt: response.data.createdAt,
+      updatedAt: response.data.updatedAt,
+    };
   } catch (error) {
     console.error("Error fetching faculty availability:", error);
     return null;

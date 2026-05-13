@@ -65,18 +65,23 @@ export interface Research {
   year: number;
 }
 
-export interface DayTimeRange {
-  startTime: string; // "09:00"
-  endTime: string; // "12:00"
+export interface TimeSlot {
+  startTime: string;
+  endTime: string;
 }
 
 export interface Availability {
-  id: string;
-  subjectIds: string[]; // Multiple subjects they can teach
-  subjectNames: string[]; // Subject names for display
-  dayTimeRanges: Record<string, DayTimeRange>; // {"Monday": {startTime, endTime}, "Wednesday": {...}}
-  schedulingPriority: "Low" | "Medium" | "High";
-  additionalNotes?: string;
+  facultyId: string;
+  priority: "low" | "medium" | "high";
+  maxClassesPerDay: number;
+  maxConsecutiveHours: number;
+  timeStart: string; // "07:00"
+  timeEnd: string; // "19:00"
+  preferredDays: string[];
+  unavailableDays: string[];
+  preferredRoomTypes: string[];
+  unavailableTimeSlots: string[]; // ["07:00-09:00", "13:00-16:00"]
+  subjectSpecializations: string[]; // Subjects they can teach (IDs)
   createdAt?: string;
   updatedAt?: string;
 }
