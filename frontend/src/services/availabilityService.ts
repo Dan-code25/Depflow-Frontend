@@ -8,7 +8,7 @@ import api from "./api";
  */
 export const getSubjects = async (): Promise<Subject[]> => {
   try {
-    const response = await api.get("/subjects/get");
+    const response = await api.get("/subjects");
     // Transform backend response to match Subject interface
     return response.data.map((subject: any) => ({
       id: subject.subject_code,
