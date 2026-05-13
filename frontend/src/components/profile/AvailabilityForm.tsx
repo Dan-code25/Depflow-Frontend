@@ -114,9 +114,7 @@ export default function AvailabilityForm({
     setFormData((prev) => ({
       ...prev,
       subjectSpecializations: isSelected
-        ? prev.subjectSpecializations.filter(
-            (s) => !codes.includes(s),
-          )
+        ? prev.subjectSpecializations.filter((s) => !codes.includes(s))
         : [
             ...prev.subjectSpecializations,
             ...codes.filter((c) => !prev.subjectSpecializations.includes(c)),
