@@ -34,6 +34,16 @@ export default function AvailabilityDisplay({
     return subjects.find((s) => s.id === subjectId)?.name || subjectId;
   };
 
+  // Get unique subject names from the subject codes
+  const getUniqueSubjectNames = (): string[] => {
+    const uniqueNames = new Set<string>();
+    availability.subjectSpecializations.forEach((subjectId) => {
+      const name = getSubjectName(subjectId);
+      uniqueNames.add(name);
+    });
+    return Array.from(uniqueNames);
+  };
+
   const capitalizeString = (str: string) => {
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
@@ -51,12 +61,12 @@ export default function AvailabilityDisplay({
           </h4>
           <div className="flex flex-wrap gap-2">
             {availability.subjectSpecializations.length > 0 ? (
-              availability.subjectSpecializations.map((subjectId) => (
+              getUniqueSubjectNames().map((subjectName) => (
                 <span
-                  key={subjectId}
+                  key={subjectName}
                   className="inline-block px-3 py-1 bg-burgundy text-white text-sm rounded-full font-medium"
                 >
-                  {subjectsLoading ? "Loading..." : getSubjectName(subjectId)}
+                  {subjectsLoading ? "Loading..." : subjectName}
                 </span>
               ))
             ) : (

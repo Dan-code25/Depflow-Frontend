@@ -28,9 +28,10 @@ export default function AvailabilityForm({
   const [errors, setErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingAvailabilityData, setPendingAvailabilityData] = useState<
-    Omit<Availability, "createdAt" | "updatedAt"> | null
-  >(null);
+  const [pendingAvailabilityData, setPendingAvailabilityData] = useState<Omit<
+    Availability,
+    "createdAt" | "updatedAt"
+  > | null>(null);
 
   const [formData, setFormData] = useState<{
     facultyId: string;
@@ -87,25 +88,63 @@ export default function AvailabilityForm({
     subject.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const getSubjectName = (subjectId: string) => {
-    return subjects.find((s) => s.id === subjectId)?.name || subjectId;
+  // Get unique subject names (deduplicated)
+  const uniqueSubjectNames = Array.from(
+    new Map(filteredSubjects.map((s) => [s.name, s])).keys(),
+  );
+
+  // Get all subject codes for a given name
+  const getSubjectCodesByName = (name: string): string[] => {
+    return subjects.filter((s) => s.name === name).map((s) => s.id);
   };
 
-  const handleSubjectToggle = (subjectId: string) => {
+  // Check if a subject name is fully selected
+  const isSubjectNameSelected = (name: string): boolean => {
+    const codes = getSubjectCodesByName(name);
+    return codes.every((code) =>
+      formData.subjectSpecializations.includes(code),
+    );
+  };
+
+  // Handle toggling entire subject name (all its codes)
+  const handleSubjectNameToggle = (name: string) => {
+    const codes = getSubjectCodesByName(name);
+    const isSelected = isSubjectNameSelected(name);
+
     setFormData((prev) => ({
       ...prev,
-      subjectSpecializations: prev.subjectSpecializations.includes(subjectId)
-        ? prev.subjectSpecializations.filter((s) => s !== subjectId)
-        : [...prev.subjectSpecializations, subjectId],
+      subjectSpecializations: isSelected
+        ? prev.subjectSpecializations.filter(
+            (s) => !codes.includes(s),
+          )
+        : [
+            ...prev.subjectSpecializations,
+            ...codes.filter((c) => !prev.subjectSpecializations.includes(c)),
+          ],
     }));
     setErrors([]);
   };
 
-  const removeSubject = (subjectId: string) => {
+  // Get unique selected subject names
+  const getSelectedSubjectNames = (): string[] => {
+    const uniqueNames = Array.from(
+      new Map(subjects.map((s) => [s.name, s])).keys(),
+    );
+    return uniqueNames.filter(
+      (name) =>
+        getSubjectCodesByName(name).length > 0 &&
+        getSubjectCodesByName(name).some((code) =>
+          formData.subjectSpecializations.includes(code),
+        ),
+    );
+  };
+
+  const removeSubject = (name: string) => {
+    const codes = getSubjectCodesByName(name);
     setFormData((prev) => ({
       ...prev,
       subjectSpecializations: prev.subjectSpecializations.filter(
-        (s) => s !== subjectId,
+        (s) => !codes.includes(s),
       ),
     }));
   };
@@ -261,361 +300,357 @@ export default function AvailabilityForm({
       />
 
       <div className="bg-white rounded-lg border border-slate-200 p-6 sm:p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xs sm:text-sm font-bold text-burgundy uppercase">
-          {availability ? "Edit" : "Set"} Teaching Availability
-        </h3>
-        <button
-          type="button"
-          onClick={handleClear}
-          className="px-3 py-2 text-sm text-slate-600 border border-slate-200 rounded hover:bg-slate-50 transition flex items-center gap-2"
-        >
-          <RotateCcw size={16} />
-          <span>Clear</span>
-        </button>
-      </div>
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xs sm:text-sm font-bold text-burgundy uppercase">
+            {availability ? "Edit" : "Set"} Teaching Availability
+          </h3>
+          <button
+            type="button"
+            onClick={handleClear}
+            className="px-3 py-2 text-sm text-slate-600 border border-slate-200 rounded hover:bg-slate-50 transition flex items-center gap-2"
+          >
+            <RotateCcw size={16} />
+            <span>Clear</span>
+          </button>
+        </div>
 
-      {/* Error Messages */}
-      {errors.length > 0 && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex gap-3">
-            <AlertCircle
-              size={20}
-              className="text-red-600 flex-shrink-0 mt-0.5"
-            />
+        {/* Error Messages */}
+        {errors.length > 0 && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex gap-3">
+              <AlertCircle
+                size={20}
+                className="text-red-600 flex-shrink-0 mt-0.5"
+              />
+              <div>
+                {errors.map((error, idx) => (
+                  <p key={idx} className="text-sm text-red-700">
+                    {error}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Subject Specializations */}
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-3">
+              Subjects You Can Teach
+            </label>
+
+            {subjectsLoading ? (
+              <p className="text-sm text-slate-500">Loading subjects...</p>
+            ) : subjects.length > 0 ? (
+              <div className="space-y-4">
+                {/* Search Input */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search subjects..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+                  />
+                </div>
+
+                {/* Subject List - Searchable Dropdown */}
+                {subjects.length > 0 && (
+                  <div className="border border-slate-100 rounded-lg bg-white max-h-56 overflow-y-auto">
+                    {uniqueSubjectNames.length > 0 ? (
+                      <div className="divide-y">
+                        {uniqueSubjectNames.map((subjectName) => (
+                          <button
+                            key={subjectName}
+                            type="button"
+                            onClick={() => {
+                              handleSubjectNameToggle(subjectName);
+                              setSearchQuery("");
+                            }}
+                            className={`w-full text-left px-4 py-3 transition flex items-center gap-3 hover:bg-burgundy/5 ${
+                              isSubjectNameSelected(subjectName)
+                                ? "bg-burgundy/10 border-l-2 border-burgundy"
+                                : ""
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition ${
+                                isSubjectNameSelected(subjectName)
+                                  ? "border-burgundy bg-burgundy"
+                                  : "border-slate-300"
+                              }`}
+                            >
+                              {isSubjectNameSelected(subjectName) && (
+                                <span className="text-white text-xs font-bold">
+                                  ✓
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-sm text-slate-700 font-medium">
+                              {subjectName}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="px-4 py-3 text-sm text-slate-500 italic">
+                        No subjects found
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Selected Subjects */}
+                {getSelectedSubjectNames().length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-600 mb-2">
+                      Selected ({getSelectedSubjectNames().length})
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {getSelectedSubjectNames().map((subjectName) => (
+                        <div
+                          key={subjectName}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-burgundy text-white rounded-full text-sm font-medium"
+                        >
+                          <span>{subjectName}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeSubject(subjectName)}
+                            className="hover:opacity-70 transition"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 italic">
+                No subjects available
+              </p>
+            )}
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">
+              Priority Level
+            </label>
+            <select
+              name="priority"
+              value={formData.priority}
+              onChange={handleInputChange}
+              className="w-full sm:w-64 px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+
+          {/* Max Classes and Consecutive Hours */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
-              {errors.map((error, idx) => (
-                <p key={idx} className="text-sm text-red-700">
-                  {error}
-                </p>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-2">
+                Max Classes Per Day
+              </label>
+              <input
+                type="number"
+                name="maxClassesPerDay"
+                value={formData.maxClassesPerDay}
+                onChange={handleInputChange}
+                min="1"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 uppercase block mb-2">
+                Max Consecutive Hours
+              </label>
+              <input
+                type="number"
+                name="maxConsecutiveHours"
+                value={formData.maxConsecutiveHours}
+                onChange={handleInputChange}
+                min="1"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Overall Time Window */}
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-4">
+              Overall Availability Window
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Start Time
+                </label>
+                <input
+                  type="time"
+                  name="timeStart"
+                  value={formData.timeStart}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  End Time
+                </label>
+                <input
+                  type="time"
+                  name="timeEnd"
+                  value={formData.timeEnd}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Preferred Days */}
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-4">
+              Preferred Days
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {DAYS_OF_WEEK.map((day) => (
+                <label
+                  key={day}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.preferredDays.includes(day)}
+                    onChange={() => handleDayToggle(day, "preferred")}
+                    className="w-4 h-4 text-burgundy border-slate-200 rounded focus:ring-2 focus:ring-burgundy"
+                  />
+                  <span className="text-sm text-slate-700">{day}</span>
+                </label>
               ))}
             </div>
           </div>
-        </div>
-      )}
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Subject Specializations */}
-        <div>
-          <label className="text-xs font-bold text-slate-500 uppercase block mb-3">
-            Subjects You Can Teach
-          </label>
+          {/* Unavailable Days */}
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-4">
+              Unavailable Days
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {DAYS_OF_WEEK.map((day) => (
+                <label
+                  key={day}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.unavailableDays.includes(day)}
+                    onChange={() => handleDayToggle(day, "unavailable")}
+                    className="w-4 h-4 text-burgundy border-slate-200 rounded focus:ring-2 focus:ring-burgundy"
+                  />
+                  <span className="text-sm text-slate-700">{day}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
-          {subjectsLoading ? (
-            <p className="text-sm text-slate-500">Loading subjects...</p>
-          ) : subjects.length > 0 ? (
-            <div className="space-y-4">
-              {/* Search Input */}
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search subjects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
-                />
-              </div>
+          {/* Preferred Room Types */}
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-4">
+              Preferred Room Types
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {roomTypes.map((roomType) => (
+                <label
+                  key={roomType}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={formData.preferredRoomTypes.includes(roomType)}
+                    onChange={() => handleRoomTypeToggle(roomType)}
+                    className="w-4 h-4 text-burgundy border-slate-200 rounded focus:ring-2 focus:ring-burgundy"
+                  />
+                  <span className="text-sm text-slate-700">{roomType}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
-              {/* Subject List - Searchable Dropdown */}
-              {subjects.length > 0 && (
-                <div className="border border-slate-100 rounded-lg bg-white max-h-56 overflow-y-auto">
-                  {filteredSubjects.length > 0 ? (
-                    <div className="divide-y">
-                      {filteredSubjects.map((subject) => (
-                        <button
-                          key={subject.id}
-                          type="button"
-                          onClick={() => {
-                            handleSubjectToggle(subject.id);
-                            setSearchQuery("");
-                          }}
-                          className={`w-full text-left px-4 py-3 transition flex items-center gap-3 hover:bg-burgundy/5 ${
-                            formData.subjectSpecializations.includes(subject.id)
-                              ? "bg-burgundy/10 border-l-2 border-burgundy"
-                              : ""
-                          }`}
-                        >
-                          <div
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition ${
-                              formData.subjectSpecializations.includes(
-                                subject.id,
-                              )
-                                ? "border-burgundy bg-burgundy"
-                                : "border-slate-300"
-                            }`}
-                          >
-                            {formData.subjectSpecializations.includes(
-                              subject.id,
-                            ) && (
-                              <span className="text-white text-xs font-bold">
-                                ✓
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-sm text-slate-700 font-medium">
-                            {subject.name}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="px-4 py-3 text-sm text-slate-500 italic">
-                      No subjects found
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Selected Subjects */}
-              {formData.subjectSpecializations.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-slate-600 mb-2">
-                    Selected ({formData.subjectSpecializations.length})
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.subjectSpecializations.map((subjectId) => (
-                      <div
-                        key={subjectId}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-burgundy text-white rounded-full text-sm font-medium"
-                      >
-                        <span>{getSubjectName(subjectId)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeSubject(subjectId)}
-                          className="hover:opacity-70 transition"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
+          {/* Unavailable Time Slots */}
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <label className="text-xs font-bold text-slate-500 uppercase block">
+                Unavailable Time Slots
+              </label>
+              <button
+                type="button"
+                onClick={addTimeSlot}
+                className="px-3 py-1 text-sm text-burgundy border border-burgundy rounded hover:bg-burgundy/5 transition flex items-center gap-1"
+              >
+                <Plus size={16} />
+                <span>Add Slot</span>
+              </button>
+            </div>
+            <div className="space-y-3">
+              {formData.unavailableTimeSlots.map((slot, index) => (
+                <div key={index} className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">
+                      Start
+                    </label>
+                    <input
+                      type="time"
+                      value={slot.startTime}
+                      onChange={(e) =>
+                        handleTimeSlotChange(index, "startTime", e.target.value)
+                      }
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+                    />
                   </div>
+                  <div className="flex-1">
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">
+                      End
+                    </label>
+                    <input
+                      type="time"
+                      value={slot.endTime}
+                      onChange={(e) =>
+                        handleTimeSlotChange(index, "endTime", e.target.value)
+                      }
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeTimeSlot(index)}
+                    className="p-2 text-red-600 border border-red-200 rounded hover:bg-red-50 transition"
+                  >
+                    <X size={16} />
+                  </button>
                 </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-500 italic">
-              No subjects available
-            </p>
-          )}
-        </div>
-
-        {/* Priority */}
-        <div>
-          <label className="text-xs font-bold text-slate-500 uppercase block mb-2">
-            Priority Level
-          </label>
-          <select
-            name="priority"
-            value={formData.priority}
-            onChange={handleInputChange}
-            className="w-full sm:w-64 px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-
-        {/* Max Classes and Consecutive Hours */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">
-              Max Classes Per Day
-            </label>
-            <input
-              type="number"
-              name="maxClassesPerDay"
-              value={formData.maxClassesPerDay}
-              onChange={handleInputChange}
-              min="1"
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">
-              Max Consecutive Hours
-            </label>
-            <input
-              type="number"
-              name="maxConsecutiveHours"
-              value={formData.maxConsecutiveHours}
-              onChange={handleInputChange}
-              min="1"
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
-            />
-          </div>
-        </div>
-
-        {/* Overall Time Window */}
-        <div>
-          <label className="text-xs font-bold text-slate-500 uppercase block mb-4">
-            Overall Availability Window
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">
-                Start Time
-              </label>
-              <input
-                type="time"
-                name="timeStart"
-                value={formData.timeStart}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-slate-600 block mb-1">
-                End Time
-              </label>
-              <input
-                type="time"
-                name="timeEnd"
-                value={formData.timeEnd}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
-              />
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Preferred Days */}
-        <div>
-          <label className="text-xs font-bold text-slate-500 uppercase block mb-4">
-            Preferred Days
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {DAYS_OF_WEEK.map((day) => (
-              <label
-                key={day}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={formData.preferredDays.includes(day)}
-                  onChange={() => handleDayToggle(day, "preferred")}
-                  className="w-4 h-4 text-burgundy border-slate-200 rounded focus:ring-2 focus:ring-burgundy"
-                />
-                <span className="text-sm text-slate-700">{day}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Unavailable Days */}
-        <div>
-          <label className="text-xs font-bold text-slate-500 uppercase block mb-4">
-            Unavailable Days
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {DAYS_OF_WEEK.map((day) => (
-              <label
-                key={day}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={formData.unavailableDays.includes(day)}
-                  onChange={() => handleDayToggle(day, "unavailable")}
-                  className="w-4 h-4 text-burgundy border-slate-200 rounded focus:ring-2 focus:ring-burgundy"
-                />
-                <span className="text-sm text-slate-700">{day}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Preferred Room Types */}
-        <div>
-          <label className="text-xs font-bold text-slate-500 uppercase block mb-4">
-            Preferred Room Types
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            {roomTypes.map((roomType) => (
-              <label
-                key={roomType}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={formData.preferredRoomTypes.includes(roomType)}
-                  onChange={() => handleRoomTypeToggle(roomType)}
-                  className="w-4 h-4 text-burgundy border-slate-200 rounded focus:ring-2 focus:ring-burgundy"
-                />
-                <span className="text-sm text-slate-700">{roomType}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Unavailable Time Slots */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <label className="text-xs font-bold text-slate-500 uppercase block">
-              Unavailable Time Slots
-            </label>
+          {/* Submit Button */}
+          <div className="flex gap-3 pt-6 border-t border-slate-200">
             <button
-              type="button"
-              onClick={addTimeSlot}
-              className="px-3 py-1 text-sm text-burgundy border border-burgundy rounded hover:bg-burgundy/5 transition flex items-center gap-1"
+              type="submit"
+              disabled={isSaving || isLoading || subjectsLoading}
+              className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-burgundy rounded hover:bg-burgundy/90 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              <Plus size={16} />
-              <span>Add Slot</span>
+              <span>✓</span> {availability ? "Update" : "Save"} Availability
             </button>
           </div>
-          <div className="space-y-3">
-            {formData.unavailableTimeSlots.map((slot, index) => (
-              <div key={index} className="flex gap-3 items-end">
-                <div className="flex-1">
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    Start
-                  </label>
-                  <input
-                    type="time"
-                    value={slot.startTime}
-                    onChange={(e) =>
-                      handleTimeSlotChange(index, "startTime", e.target.value)
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    End
-                  </label>
-                  <input
-                    type="time"
-                    value={slot.endTime}
-                    onChange={(e) =>
-                      handleTimeSlotChange(index, "endTime", e.target.value)
-                    }
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeTimeSlot(index)}
-                  className="p-2 text-red-600 border border-red-200 rounded hover:bg-red-50 transition"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Submit Button */}
-        <div className="flex gap-3 pt-6 border-t border-slate-200">
-          <button
-            type="submit"
-            disabled={isSaving || isLoading || subjectsLoading}
-            className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-burgundy rounded hover:bg-burgundy/90 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            <span>✓</span> {availability ? "Update" : "Save"} Availability
-          </button>
-        </div>
-      </form>
-    </div>
+        </form>
+      </div>
     </>
   );
 }
