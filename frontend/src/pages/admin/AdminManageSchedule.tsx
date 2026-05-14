@@ -1234,50 +1234,28 @@ function AutoFixResultsModal({
 // LIST VIEW AND TIMETABLE VIEW (Minified)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function ListView({
-  data,
-  otherFacs = [],
-  otherRooms = [],
-  onEdit,
-  onDelete,
-}: any) {
-  // Helper to convert 24hr string (07:00) to 12hr with AM/PM (7:00 AM)
+function ListView({ data, otherFacs = [], otherRooms = [], onEdit, onDelete }: any) {
+  // 12-hour time formatter used in previous updates
   const formatTime12h = (timeStr: string) => {
     if (!timeStr || timeStr === "TBD") return "TBA";
-    const [hours, minutes] = timeStr.split(":").map(Number);
-    const ampm = hours >= 12 ? "PM" : "AM";
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
     const hour12 = hours % 12 || 12;
-    return `${hour12}:${minutes.toString().padStart(2, "0")} ${ampm}`;
+    return `${hour12}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   };
 
   return (
     <div className="w-full bg-white border border-gray-100 rounded-2xl overflow-hidden font-lexend shadow-sm">
-      {/* ── Table-style Header (8 Columns) ── */}
-      <div className="hidden lg:grid grid-cols-[0.8fr_0.6fr_0.5fr_1.4fr_0.8fr_0.7fr_1.3fr_0.8fr] gap-4 px-6 py-4 bg-gray-50 border-b border-gray-100">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          Code
-        </span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          Section
-        </span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          Day
-        </span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          Time (AM/PM)
-        </span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          Room
-        </span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">
-          Status
-        </span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-          Faculty
-        </span>
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">
-          Actions
-        </span>
+      {/* ── Table Header: Matched to MySchedule styles ── */}
+      <div className="hidden lg:grid grid-cols-[0.9fr_0.6fr_0.6fr_1.6fr_0.8fr_0.8fr_1.3fr_0.8fr] gap-4 px-6 py-4 bg-gray-50 border-b border-gray-100">
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Subject Code</span>
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Section</span>
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Day</span>
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Time</span>
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Room</span>
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide text-center">Status</span>
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Faculty</span>
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wide text-right">Actions</span>
       </div>
 
       {/* ── List Rows ── */}
@@ -1288,103 +1266,74 @@ function ListView({
           const r = getRoom(s.room_id ?? "");
           const isGuest = !!s.other_faculty_id;
           const isUnassigned = s.faculty_id === "TBD" && !isGuest;
-
-          const guestFacName =
-            otherFacs.find((x: any) => x.id === s.other_faculty_id)
-              ?.faculty_name || "Guest Faculty";
-          const guestRoomName =
-            otherRooms.find((x: any) => x.id === s.other_room_id)?.room_name ||
-            "Guest Room";
+          
+          const guestFacName = otherFacs.find((x: any) => x.id === s.other_faculty_id)?.faculty_name || "Guest Faculty";
+          const guestRoomName = otherRooms.find((x: any) => x.id === s.other_room_id)?.room_name || "Guest Room";
 
           return (
-            <div
-              key={s.schedule_id}
-              className="group hover:bg-gray-50/50 transition-colors relative"
-            >
+            <div key={s.schedule_id} className="group hover:bg-gray-50/50 transition-colors relative">
+              {/* Hover highlight line */}
               <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#8B0000] opacity-0 group-hover:opacity-100 transition-opacity" />
 
-              <div className="lg:grid lg:grid-cols-[0.8fr_0.6fr_0.5fr_1.4fr_0.8fr_0.7fr_1.3fr_0.8fr] flex flex-col gap-4 px-6 py-5 items-start lg:items-center">
-                {/* 1. Subject Code */}
+              <div className="lg:grid lg:grid-cols-[0.9fr_0.6fr_0.6fr_1.6fr_0.8fr_0.8fr_1.3fr_0.8fr] flex flex-col gap-4 px-6 py-5 items-start lg:items-center">
+                
+                {/* 1. Subject Code: text-sm font-bold text-[#8B0000] */}
                 <div className="min-w-0">
-                  <p className="text-sm font-black text-gray-900">
-                    {sub?.code}
-                  </p>
+                  <p className="text-sm font-bold text-[#8B0000] uppercase tracking-tight">{sub?.code}</p>
                 </div>
 
-                {/* 2. Section (Now same font style as Code) */}
+                {/* 2. Section: text-sm font-semibold text-gray-700 */}
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-gray-800 uppercase">
-                    {s.section}
-                  </p>
+                   <p className="text-sm font-semibold text-gray-700 uppercase">{s.section}</p>
                 </div>
 
-                {/* 3. Day */}
-                <div className="text-xs font-bold text-gray-700">
-                  {s.day === "TBD" ? (
-                    <span className="text-amber-500 italic">TBA</span>
-                  ) : (
-                    s.day
-                  )}
+                {/* 3. Day: text-sm font-semibold text-gray-700 */}
+                <div className="text-sm font-semibold text-gray-700">
+                  {s.day === "TBD" ? <span className="text-amber-500 italic">TBA</span> : s.day}
                 </div>
 
-                {/* 4. Time (AM/PM) */}
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-bold text-gray-800 uppercase">
-                    {s.start_time === "TBD" ? (
-                      <span className="text-amber-500 italic">TBA</span>
-                    ) : (
-                      `${formatTime12h(s.start_time)} - ${formatTime12h(s.end_time)}`
-                    )}
-                  </p>
+                {/* 4. Time: text-sm font-semibold text-gray-700 */}
+                <div className="text-sm font-semibold text-gray-700 uppercase whitespace-nowrap">
+                  {s.start_time === "TBD" ? 
+                    <span className="text-amber-500 italic">TBA</span> : 
+                    `${formatTime12h(s.start_time)} - ${formatTime12h(s.end_time)}`
+                  }
                 </div>
 
-                {/* 5. Room */}
-                <div className="text-xs font-bold text-gray-800 truncate">
-                  {s.other_room_id
-                    ? guestRoomName
-                    : (r?.room ?? (
-                        <span className="text-amber-500 italic">TBA</span>
-                      ))}
+                {/* 5. Room: text-sm text-gray-700 */}
+                <div className="text-sm text-gray-700 truncate">
+                  {s.other_room_id ? guestRoomName : (r?.room ?? <span className="text-amber-500 italic">TBA</span>)}
                 </div>
 
-                {/* 6. Status Badge */}
+                {/* 6. Status Badge: Kept for logic, text inside matched */}
                 <div className="lg:text-center w-full lg:w-auto">
                   <StatusBadge status={s.status} />
                 </div>
 
-                {/* 7. Faculty Member */}
-                <div className="flex items-center gap-3 min-w-0 w-full lg:w-auto">
+                {/* 7. Faculty Member: text-sm font-semibold text-gray-700 */}
+                <div className="min-w-0 w-full lg:w-auto">
                   {isUnassigned ? (
-                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100">
+                    <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-2 py-1 rounded-lg border border-amber-100 w-fit">
                       <Users size={12} />
-                      <span className="text-[10px] font-bold uppercase tracking-tighter">
-                        Unassigned
-                      </span>
+                      <span className="text-[10px] font-bold uppercase tracking-tighter">Needs Faculty</span>
                     </div>
                   ) : (
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-gray-900 truncate">
-                        {isGuest ? guestFacName : getFacultyName(f)}
-                      </p>
-                    </div>
+                    <p className="text-sm font-semibold text-gray-700 truncate">
+                      {isGuest ? guestFacName : getFacultyName(f)}
+                    </p>
                   )}
                 </div>
 
                 {/* 8. Actions */}
                 <div className="flex items-center justify-end gap-1 w-full lg:w-auto opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => onEdit(s)}
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
-                  >
-                    <Pencil size={14} />
+                  <button onClick={() => onEdit(s)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
+                    <Pencil size={15}/>
                   </button>
-                  <button
-                    onClick={() => onDelete(s)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                  >
-                    <Trash2 size={14} />
+                  <button onClick={() => onDelete(s)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                    <Trash2 size={15}/>
                   </button>
                 </div>
+
               </div>
             </div>
           );
@@ -1705,16 +1654,31 @@ function ScheduleStatCard({
   sub?: string;
 }) {
   return (
-    <div className="bg-white border-t-4 border-t-[#8B0000] rounded-xl p-4 flex items-start gap-3 shadow-sm">
-      <div className="bg-[#FFF3F3] p-2.5 rounded-lg text-[#8B0000]">{icon}</div>
-      <div>
-        <p className="text-xs font-bold text-gray-400 tracking-wider">
-          {label}
-        </p>
-        <p className="text-2xl font-black text-[#8B0000] leading-tight">
-          {value}
-        </p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    <div className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-all hover:border-burgundy cursor-pointer">
+      <div className="flex items-center gap-4">
+        {/* Icon: Matches DashboardCard circle style */}
+        <div className="bg-burgundy rounded-full p-4 flex-shrink-0 flex items-center justify-center text-white">
+          {icon}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold text-slate-600 uppercase tracking-wide mb-2">
+            {label}
+          </h3>
+
+          {/* Value: Increased to 4xl to match Dashboard */}
+          <p className="text-4xl font-bold text-burgundy mb-2">
+            {value}
+          </p>
+
+          {/* Subtext: Matches Dashboard description style */}
+          {sub && (
+            <p className="text-xs text-slate-500">
+              {sub}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
