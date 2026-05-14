@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useAutoLogin } from "./hooks/useAutoLogin";
+import { usePageTitle } from "./hooks/usePageTitle";
 import Login from "./pages/auth/Login";
 import NotFound from "./pages/NotFound";
 import { GoogleOAuthProvider } from "@react-oauth/google";
@@ -22,6 +23,7 @@ const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function AppRoutes() {
   const { isCheckingAuth } = useAutoLogin();
+  usePageTitle(); // Update page title based on current route
 
   if (isCheckingAuth) {
     return (
