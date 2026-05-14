@@ -3,6 +3,7 @@ import { FacultyLayout } from "../../components/layout/FacultyLayout";
 import { PageHeader } from "../../components/admin/PageHeader";
 import { ScheduleTimetable } from "../../components/schedule/ScheduleTimetable";
 import { ScheduleListView } from "../../components/schedule/ScheduleCardView";
+import { LoadingSpinner } from "../../components/common/LoadingSpinner";
 import {
   CalendarClock,
   List,
@@ -93,8 +94,19 @@ export default function MySchedule() {
 
         <div className="px-6 py-8">
           {loading && (
-            <div className="flex items-center justify-center py-12">
-              <p className="text-gray-500">Loading schedule...</p>
+            <div className="bg-white border border-slate-200 rounded-lg p-12 shadow-sm">
+              <div className="flex flex-col items-center justify-center gap-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-burgundy/10 rounded-full blur-lg" />
+                  <LoadingSpinner size="lg" color="burgundy" />
+                </div>
+                <h3 className="text-lg font-semibold text-charcoal">
+                  Loading your schedule...
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Please wait while we fetch your schedule
+                </p>
+              </div>
             </div>
           )}
 

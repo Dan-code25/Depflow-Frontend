@@ -1,6 +1,8 @@
 import type { ProfileData } from "../../types/profile";
-import { Mail, Phone, Briefcase, Clock, Camera } from "lucide-react";
+import { Mail, Phone, Briefcase, Clock, Camera, Zap } from "lucide-react";
 import profilePlaceholder from "../../assets/profile-placeholder.svg";
+import { useState, useEffect } from "react";
+import { getLoadUnits } from "../../services/dashboardService";
 
 interface ProfileSidebarProps {
   data: ProfileData;
@@ -13,12 +15,52 @@ export default function ProfileSidebar({
   onProfilePictureChange,
   readOnly = false,
 }: ProfileSidebarProps) {
+  const [currentUnits, setCurrentUnits] = useState<number>(0);
+  const [maxUnits, setMaxUnits] = useState<number>(24);
+  const [isLoadingUnits, setIsLoadingUnits] = useState(true);
+
+  useEffect(() => {
+    const fetchLoadUnits = async () => {
+      try {
+        setIsLoadingUnits(true);
+        const data = await getLoadUnits();
+        setCurrentUnits(data.currentUnits);
+        setMaxUnits(data.maxUnits);
+      } catch (error) {
+        console.error("Error fetching load units:", error);
+        setCurrentUnits(0);
+        setMaxUnits(24);
+      } finally {
+        setIsLoadingUnits(false);
+      }
+    };
+
+    fetchLoadUnits();
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onProfilePictureChange) {
       onProfilePictureChange(file);
     }
   };
+
+  // Get load color based on percentage
+  const getLoadColor = () => {
+    const percentage = (currentUnits / maxUnits) * 100;
+    const isOverloaded = currentUnits > maxUnits;
+
+    if (isOverloaded || percentage > 90) {
+      return { bar: "bg-red-600", text: "text-red-600" };
+    } else if (percentage > 70) {
+      return { bar: "bg-amber-500", text: "text-amber-600" };
+    } else {
+      return { bar: "bg-green-600", text: "text-green-600" };
+    }
+  };
+
+  const loadColor = getLoadColor();
+  const percentage = (currentUnits / maxUnits) * 100;
 
   return (
     <div className="space-y-4">
@@ -100,6 +142,57 @@ export default function ProfileSidebar({
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Load Units Section */}
+        <div className="px-5 py-5 border-t border-slate-200">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap
+              size={16}
+              className={isLoadingUnits ? "text-burgundy" : loadColor.text}
+            />
+            <h3 className="text-xs font-bold text-burgundy uppercase tracking-wide">
+              Load Units
+            </h3>
+          </div>
+          {isLoadingUnits ? (
+            <div className="flex items-center justify-center h-20">
+              <div className="w-4 h-4 border-2 border-burgundy border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Units Display */}
+              <div className="flex items-baseline gap-2">
+                <span className={`text-2xl font-bold ${loadColor.text}`}>
+                  {currentUnits}
+                </span>
+                <span className="text-xs text-slate-600">
+                  / {maxUnits} units
+                </span>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${loadColor.bar}`}
+                  style={{ width: `${Math.min(percentage, 100)}%` }}
+                />
+              </div>
+
+              {/* Status Text */}
+              <div className="text-xs text-slate-600">
+                {percentage > 90 ? (
+                  <span className="text-red-600 font-medium">Overloaded</span>
+                ) : percentage > 70 ? (
+                  <span className="text-amber-600 font-medium">High Load</span>
+                ) : (
+                  <span className="text-green-600 font-medium">
+                    Normal Load
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

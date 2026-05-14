@@ -13,6 +13,10 @@ import {
   EmploymentTypePieChart,
   type EmploymentTypeData,
 } from "../../components/admin/EmploymentTypePieChart";
+import {
+  RoomUtilizationChart,
+  type RoomUtilizationData,
+} from "../../components/admin/RoomUtilizationChart";
 import { analyticsService } from "../../services/analyticsService";
 import { BarChart3 } from "lucide-react";
 
@@ -36,21 +40,46 @@ export default function AdminAnalyticsPage() {
     null,
   );
 
+  // Room Utilization Chart State
+  const [roomUtilizationData, setRoomUtilizationData] = useState<
+    RoomUtilizationData[]
+  >([]);
+  const [roomUtilizationLoading, setRoomUtilizationLoading] = useState(true);
+  const [roomUtilizationError, setRoomUtilizationError] = useState<
+    string | null
+  >(null);
+
   // Fetch analytics data on component mount
   useEffect(() => {
     const fetchAnalyticsData = async () => {
       try {
         const data = await analyticsService.getAllAnalyticsData();
 
-        // Set all data
-        setCoreGroupData(data.coreGroups);
-        setGenderData(data.gender);
-        setEmploymentTypeData(data.employmentTypes);
+        // Set all data (will be empty arrays if fetch failed)
+        setCoreGroupData(data.coreGroups || []);
+        setGenderData(data.gender || []);
+        setEmploymentTypeData(data.employmentTypes || []);
+        setRoomUtilizationData(data.roomUtilization || []);
 
-        // Clear errors
+        // Clear all errors initially
         setCoreGroupError(null);
         setGenderError(null);
         setEmploymentTypeError(null);
+        setRoomUtilizationError(null);
+
+        // Set error if specific data is empty (but don't fail entirely)
+        if (!data.coreGroups || data.coreGroups.length === 0) {
+          setCoreGroupError("No data available");
+        }
+        if (!data.gender || data.gender.length === 0) {
+          setGenderError("No data available");
+        }
+        if (!data.employmentTypes || data.employmentTypes.length === 0) {
+          setEmploymentTypeError("No data available");
+        }
+        if (!data.roomUtilization || data.roomUtilization.length === 0) {
+          setRoomUtilizationError("No data available");
+        }
       } catch (error) {
         console.error("Error fetching analytics:", error);
         const errorMessage =
@@ -58,10 +87,12 @@ export default function AdminAnalyticsPage() {
         setCoreGroupError(errorMessage);
         setGenderError(errorMessage);
         setEmploymentTypeError(errorMessage);
+        setRoomUtilizationError(errorMessage);
       } finally {
         setCoreGroupLoading(false);
         setGenderLoading(false);
         setEmploymentTypeLoading(false);
+        setRoomUtilizationLoading(false);
       }
     };
 
@@ -116,6 +147,22 @@ export default function AdminAnalyticsPage() {
     }
   };
 
+  // Handle retry for room utilization
+  const handleReloadRoomUtilization = async () => {
+    try {
+      setRoomUtilizationLoading(true);
+      setRoomUtilizationError(null);
+      const data = await analyticsService.getRoomUtilizationData();
+      setRoomUtilizationData(data);
+    } catch (error) {
+      setRoomUtilizationError(
+        error instanceof Error ? error.message : "Failed to fetch data",
+      );
+    } finally {
+      setRoomUtilizationLoading(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -124,36 +171,67 @@ export default function AdminAnalyticsPage() {
           <PageHeader
             title="Analytics"
             description="View faculty statistics and analytics across different dimensions"
-            Icon = {<BarChart3 size={28} className="text-burgundy" />}
+            Icon={<BarChart3 size={28} className="text-burgundy" />}
           />
         </div>
 
         {/* Charts Section */}
         <div className="container-main py-8 space-y-8">
-          {/* Core Group Bar Chart */}
-          <div>
-            {coreGroupError ? (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-6 flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-red-900 mb-1">
-                    Error Loading Core Group Data
-                  </h3>
-                  <p className="text-red-700 text-sm">{coreGroupError}</p>
+          {/* Core Group Bar Chart and Room Utilization Chart Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Core Group Bar Chart */}
+            <div>
+              {coreGroupError ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-red-900 mb-1">
+                      Error Loading Core Group Data
+                    </h3>
+                    <p className="text-red-700 text-sm">{coreGroupError}</p>
+                  </div>
+                  <button
+                    onClick={handleReloadCoreGroup}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
+                  >
+                    Retry
+                  </button>
                 </div>
-                <button
-                  onClick={handleReloadCoreGroup}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : (
-              <CoreGroupBarChart
-                data={coreGroupData}
-                isLoading={coreGroupLoading}
-                height={400}
-              />
-            )}
+              ) : (
+                <CoreGroupBarChart
+                  data={coreGroupData}
+                  isLoading={coreGroupLoading}
+                  height={400}
+                />
+              )}
+            </div>
+
+            {/* Room Utilization Chart */}
+            <div>
+              {roomUtilizationError ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-red-900 mb-1">
+                      Error Loading Room Utilization Data
+                    </h3>
+                    <p className="text-red-700 text-sm">
+                      {roomUtilizationError}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleReloadRoomUtilization}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition whitespace-nowrap"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <RoomUtilizationChart
+                  data={roomUtilizationData}
+                  isLoading={roomUtilizationLoading}
+                  height={400}
+                />
+              )}
+            </div>
           </div>
 
           {/* Gender and Employment Type Charts in Grid */}
