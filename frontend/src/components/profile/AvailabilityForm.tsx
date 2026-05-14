@@ -305,7 +305,7 @@ export default function AvailabilityForm({
           <button
             type="button"
             onClick={handleClear}
-            className="px-3 py-2 text-sm text-slate-600 border border-slate-200 rounded hover:bg-slate-50 transition flex items-center gap-2"
+            className="px-3 py-2 text-sm text-slate-600 border border-slate-200 rounded hover:bg-slate-50 transition flex items-center gap-2 cursor-pointer"
           >
             <RotateCcw size={16} />
             <span>Clear</span>
@@ -366,7 +366,7 @@ export default function AvailabilityForm({
                               handleSubjectNameToggle(subjectName);
                               setSearchQuery("");
                             }}
-                            className={`w-full text-left px-4 py-3 transition flex items-center gap-3 hover:bg-burgundy/5 ${
+                            className={`w-full text-left px-4 py-3 transition flex items-center gap-3 hover:bg-burgundy/5 cursor-pointer ${
                               isSubjectNameSelected(subjectName)
                                 ? "bg-burgundy/10 border-l-2 border-burgundy"
                                 : ""
@@ -441,7 +441,7 @@ export default function AvailabilityForm({
               name="priority"
               value={formData.priority}
               onChange={handleInputChange}
-              className="w-full sm:w-64 px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+              className="w-full sm:w-64 px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent cursor-pointer"
             >
               <option value="low">Low</option>
               <option value="medium">Medium</option>
@@ -590,7 +590,7 @@ export default function AvailabilityForm({
               <button
                 type="button"
                 onClick={addTimeSlot}
-                className="px-3 py-1 text-sm text-burgundy border border-burgundy rounded hover:bg-burgundy/5 transition flex items-center gap-1"
+                className="px-3 py-1 text-sm text-burgundy border border-burgundy rounded hover:bg-burgundy/5 transition flex items-center gap-1 cursor-pointer"
               >
                 <Plus size={16} />
                 <span>Add Slot</span>
@@ -628,7 +628,7 @@ export default function AvailabilityForm({
                   <button
                     type="button"
                     onClick={() => removeTimeSlot(index)}
-                    className="p-2 text-red-600 border border-red-200 rounded hover:bg-red-50 transition"
+                    className="p-2 text-red-600 border border-red-200 rounded hover:bg-red-50 transition cursor-pointer"
                   >
                     <X size={16} />
                   </button>

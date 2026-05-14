@@ -35,7 +35,7 @@ export default function FormField({
           name={name}
           value={value || ""}
           onChange={onChange}
-          className="w-full px-3 py-2 text-sm sm:text-base border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+          className="w-full px-3 py-2 text-sm sm:text-base border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent cursor-pointer"
         >
           {!value && (
             <option value="">{placeholder || "Select an option"}</option>

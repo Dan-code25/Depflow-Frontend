@@ -171,7 +171,7 @@ export default function FacultyProfileViewPage() {
         <div className="container-main pt-6">
           <button
             onClick={() => navigate(backPath)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-burgundy hover:text-burgundy/80 transition-colors font-medium"
+            className="inline-flex items-center gap-2 px-4 py-2 text-burgundy hover:text-burgundy/80 transition-colors font-medium cursor-pointer"
           >
             <ArrowLeft size={20} />
             Back

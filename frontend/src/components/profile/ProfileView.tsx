@@ -137,7 +137,7 @@ export default function ProfileView({
           {!readOnly && onEdit && (
             <button
               onClick={onEdit}
-              className="px-3 sm:px-4 py-2 border-2 border-burgundy text-burgundy rounded hover:bg-burgundy hover:text-white transition flex items-center gap-2 text-sm"
+              className="px-3 sm:px-4 py-2 border-2 border-burgundy text-burgundy rounded hover:bg-burgundy hover:text-white transition flex items-center gap-2 text-sm cursor-pointer"
             >
               <Edit2 size={18} />
               <span>Edit</span>

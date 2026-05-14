@@ -187,14 +187,14 @@ export default function ProfileEdit({
       <div className="flex gap-3 pt-6 border-t border-slate-200">
         <button
           onClick={onCancel}
-          className="px-5 py-2.5 text-slate-700 hover:text-charcoal hover:bg-slate-100 rounded-lg transition-all duration-200 font-semibold flex items-center gap-2"
+          className="px-5 py-2.5 text-slate-700 hover:text-charcoal hover:bg-slate-100 rounded-lg transition-all duration-200 font-semibold flex items-center gap-2 cursor-pointer"
         >
           <X size={18} />
           <span>Cancel</span>
         </button>
         <button
           onClick={onSave}
-          className="px-6 py-2.5 bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white rounded-lg transition-all duration-200 font-semibold flex items-center gap-2 shadow-md hover:shadow-lg"
+          className="px-6 py-2.5 bg-gradient-to-r from-burgundy to-burgundy/90 hover:from-burgundy/90 hover:to-burgundy/80 text-white rounded-lg transition-all duration-200 font-semibold flex items-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
         >
           <Save size={18} />
           <span>Save Changes</span>

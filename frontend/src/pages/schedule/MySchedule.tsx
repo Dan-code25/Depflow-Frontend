@@ -155,7 +155,7 @@ export default function MySchedule() {
                             e.target.value === "" ? null : e.target.value,
                           )
                         }
-                        className="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent transition-all"
+                        className="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent transition-all cursor-pointer"
                       >
                         <option value="">All Courses</option>
                         {uniqueCourses.map((course) => (
@@ -179,7 +179,7 @@ export default function MySchedule() {
                             e.target.value === "" ? null : e.target.value,
                           )
                         }
-                        className="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent transition-all"
+                        className="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent transition-all cursor-pointer"
                       >
                         <option value="">All Days</option>
                         {ALL_DAYS.map((day) => (
@@ -197,7 +197,7 @@ export default function MySchedule() {
                           setSelectedCourse(null);
                           setSelectedDay(null);
                         }}
-                        className="px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-sm font-medium transition-all duration-200 h-fit"
+                        className="px-4 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-sm font-medium transition-all duration-200 h-fit cursor-pointer"
                       >
                         Clear Filters
                       </button>
@@ -210,7 +210,7 @@ export default function MySchedule() {
               <div className="flex gap-2 mb-6">
                 <button
                   onClick={() => setView("list")}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
                     view === "list"
                       ? "bg-burgundy border-burgundy text-white"
                       : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -221,7 +221,7 @@ export default function MySchedule() {
                 </button>
                 <button
                   onClick={() => setView("timetable")}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
                     view === "timetable"
                       ? "bg-burgundy border-burgundy text-white"
                       : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"

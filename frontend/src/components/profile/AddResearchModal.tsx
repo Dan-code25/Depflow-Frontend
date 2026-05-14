@@ -62,7 +62,7 @@ export default function AddResearchModal({
           </h2>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-slate-100 rounded transition"
+            className="p-1 hover:bg-slate-100 rounded transition cursor-pointer"
             aria-label="Close modal"
           >
             <X size={24} className="text-slate-600" />
@@ -113,7 +113,7 @@ export default function AddResearchModal({
                 value={formData.type}
                 onChange={handleInputChange}
                 required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent cursor-pointer"
               >
                 <option value="Journal">Journal</option>
                 <option value="Conference">Conference</option>
@@ -148,13 +148,13 @@ export default function AddResearchModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded hover:bg-slate-50 transition"
+              className="flex-1 px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded hover:bg-slate-50 transition cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-burgundy rounded hover:bg-burgundy/90 transition flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-burgundy rounded hover:bg-burgundy/90 transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>✓</span> Add Research
             </button>

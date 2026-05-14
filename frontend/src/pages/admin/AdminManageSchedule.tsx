@@ -231,7 +231,7 @@ function ScheduleFormModal({ editing, onSave, onClose, activeSem, curriculums, o
         {/* Subject */}
         <div className="col-span-2">
           <label className="block text-xs font-semibold text-gray-600 mb-1.5">Subject <span className="text-red-500">*</span></label>
-          <select className={inputCls} value={form.subject_id} onChange={e=>set("subject_id",e.target.value)}>
+          <select className={`${inputCls} cursor-pointer`} value={form.subject_id} onChange={e=>set("subject_id",e.target.value)}>
             <option value="">Select subject...</option>
             {availableSubjects.map(s=><option key={s.id} value={s.id}>{s.code} — {s.name} ({s.units} units)</option>)}
           </select>
@@ -240,7 +240,7 @@ function ScheduleFormModal({ editing, onSave, onClose, activeSem, curriculums, o
         {/* Section (Database Driven ONLY) */}
         <div className="col-span-2">
           <label className="block text-xs font-semibold text-gray-600 mb-1.5">Section <span className="text-red-500">*</span></label>
-          <select className={inputCls} value={form.section} onChange={e=>set("section",e.target.value)}>
+          <select className={`${inputCls} cursor-pointer`} value={form.section} onChange={e=>set("section",e.target.value)}>
             <option value="">Select section...</option>
             {availableSections.map(sec => <option key={sec.label} value={sec.label}>{sec.label}</option>)}
           </select>
@@ -251,7 +251,7 @@ function ScheduleFormModal({ editing, onSave, onClose, activeSem, curriculums, o
         <div className="col-span-2">
           <label className="block text-xs font-semibold text-gray-600 mb-1.5">Faculty Member</label>
           <select 
-            className={inputCls} 
+            className={`${inputCls} cursor-pointer`} 
             value={displayFacId} // 👈 Uses the new display variable
             onChange={e => {
               const val = e.target.value;
@@ -278,7 +278,7 @@ function ScheduleFormModal({ editing, onSave, onClose, activeSem, curriculums, o
         <div className="col-span-2">
           <label className="block text-xs font-semibold text-gray-600 mb-1.5">Room</label>
           <select 
-            className={inputCls} 
+            className={`${inputCls} cursor-pointer`} 
             value={displayRoomId} // 👈 Uses the new display variable
             onChange={e => {
               const val = e.target.value;
@@ -304,7 +304,7 @@ function ScheduleFormModal({ editing, onSave, onClose, activeSem, curriculums, o
         {/* Day */}
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs font-semibold text-gray-600 mb-1.5">Day</label>
-          <select className={inputCls} value={form.day} onChange={e=>set("day",e.target.value)}>
+          <select className={`${inputCls} cursor-pointer`} value={form.day} onChange={e=>set("day",e.target.value)}>
             <option value="TBD">TBA / To Be Decided</option>
             {DAYS.map(d=><option key={d} value={d}>{d}</option>)}
           </select>
@@ -353,8 +353,8 @@ function DeleteModal({ schedule, onConfirm, onClose }: any) {
         <p className="text-sm text-gray-500 leading-relaxed"><span className="font-semibold text-gray-700">{s?.code}</span><br/>Assigned to <span className="font-semibold">{getFacultyName(f)}</span></p>
       </div>
       <div className="flex gap-3 mt-5">
-        <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-        <button onClick={onConfirm} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 rounded-xl text-sm font-semibold text-white transition-colors">Remove</button>
+        <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">Cancel</button>
+        <button onClick={onConfirm} className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 rounded-xl text-sm font-semibold text-white transition-colors cursor-pointer">Remove</button>
       </div>
     </Modal>
   );
@@ -388,7 +388,7 @@ function ConflictCard({ c, onApply, onDismiss, onTransfer }: any) {
                     <p className="text-xs font-bold text-gray-800">{t.subjectCode} <span className="ml-1.5 text-[10px] font-normal text-gray-400">({t.units}u)</span></p>
                     <p className="text-[10px] text-gray-500 truncate">→ {t.toFacultyName}</p>
                   </div>
-                  <button onClick={() => onTransfer(t)} disabled={!t.toFacultyId} className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${t.toFacultyId ? "bg-[#8B0000] text-white hover:bg-[#6B0000]" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
+                  <button onClick={() => onTransfer(t)} disabled={!t.toFacultyId} className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${t.toFacultyId ? "bg-[#8B0000] text-white hover:bg-[#6B0000]" : "bg-gray-200 text-gray-400 cursor-not-allowed"} cursor-pointer`}>
                     <ShieldCheck size={11}/> Transfer
                   </button>
                 </div>
@@ -406,8 +406,8 @@ function ConflictCard({ c, onApply, onDismiss, onTransfer }: any) {
         </div>
       </div>
       <div className="flex gap-2 mt-3">
-        {onApply && <button onClick={()=>onApply(c)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white transition-colors ${isHard ? "bg-[#8B0000] hover:bg-[#6B0000]" : "bg-violet-600 hover:bg-violet-700"}`}><ShieldCheck size={13}/> Apply Suggestion</button>}
-        {onDismiss && <button onClick={()=>onDismiss(c.id)} className="flex-1 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors">Dismiss</button>}
+        {onApply && <button onClick={()=>onApply(c)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white transition-colors cursor-pointer ${isHard ? "bg-[#8B0000] hover:bg-[#6B0000]" : "bg-violet-600 hover:bg-violet-700"}`}><ShieldCheck size={13}/> Apply Suggestion</button>}
+        {onDismiss && <button onClick={()=>onDismiss(c.id)} className="flex-1 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">Dismiss</button>}
       </div>
     </div>
   );
@@ -484,11 +484,11 @@ function SetupSectionsModal({ onClose, activeSem, onSave }: any) {
           Total Sections to Generate: <span className="font-bold text-indigo-600 text-lg">{totalSections}</span>
         </div>
         <div className="flex gap-2">
-          <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer">Cancel</button>
           <button 
             onClick={handleSave} 
             disabled={saving || totalSections === 0} 
-            className={`px-5 py-2 rounded-xl text-sm font-bold text-white transition-colors ${saving || totalSections === 0 ? "bg-gray-300 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"}`}
+            className={`px-5 py-2 rounded-xl text-sm font-bold text-white transition-colors cursor-pointer ${saving || totalSections === 0 ? "bg-gray-300 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700"}`}
           >
             {saving ? "Saving..." : "Generate Sections"}
           </button>
@@ -648,7 +648,7 @@ function AutoFixResultsModal({ data, onClose }: {
       )}
 
       <div className="mt-6 pt-4 border-t border-gray-100 text-right">
-        <button onClick={onClose} className="px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-bold transition-colors">
+        <button onClick={onClose} className="px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-bold transition-colors cursor-pointer">
           Got it
         </button>
       </div>
@@ -755,10 +755,10 @@ function ListView({ data, otherFacs = [], otherRooms = [], onEdit, onDelete }: a
 
                 {/* 8. Actions */}
                 <div className="flex items-center justify-end gap-1 w-full lg:w-auto opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => onEdit(s)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
+                  <button onClick={() => onEdit(s)} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer">
                     <Pencil size={14}/>
                   </button>
-                  <button onClick={() => onDelete(s)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                  <button onClick={() => onDelete(s)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer">
                     <Trash2 size={14}/>
                   </button>
                 </div>
@@ -818,8 +818,8 @@ function TimetableView({ data, onEdit, onDelete }: any) {
                   {blockH > 72 && <p className="text-[10px] text-gray-400 truncate">📍 {r?.other_room ?? "No room"}</p>}
                   {blockH > 74 && (
                     <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={e=>{e.stopPropagation();onEdit(s);}} className="flex-1 bg-[#8B0000] text-white text-[9px] font-bold rounded py-0.5">Edit</button>
-                      <button onClick={e=>{e.stopPropagation();onDelete(s);}} className="flex-1 bg-red-500 text-white text-[9px] font-bold rounded py-0.5">Del</button>
+                      <button onClick={e=>{e.stopPropagation();onEdit(s);}} className="flex-1 bg-[#8B0000] text-white text-[9px] font-bold rounded py-0.5 cursor-pointer">Edit</button>
+                      <button onClick={e=>{e.stopPropagation();onDelete(s);}} className="flex-1 bg-red-500 text-white text-[9px] font-bold rounded py-0.5 cursor-pointer">Del</button>
                     </div>
                   )}
                 </div>
@@ -1660,33 +1660,33 @@ export default function ManageSchedule() {
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 flex-1 min-w-[130px]">
                 <span className="text-xs text-gray-400 shrink-0">Day:</span>
-                <select className={inputCls} value={filterDay} onChange={e=>setFilterDay(e.target.value)}><option value="All">All Days</option>{DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
+                <select className={`${inputCls} cursor-pointer`} value={filterDay} onChange={e=>setFilterDay(e.target.value)}><option value="All">All Days</option>{DAYS.map(d=><option key={d} value={d}>{d}</option>)}</select>
               </div>
               
               <div className="flex items-center gap-2 flex-1 min-w-[170px]">
                 <span className="text-xs text-gray-400 shrink-0">Faculty:</span>
-                <select className={inputCls} value={filterFac} onChange={e=>setFilterFac(e.target.value)}><option value="All">All Faculty</option>{FACULTY_LIST.map(f=>(<option key={f.id} value={f.id}>{getFacultyName(f as ReturnType<typeof getFaculty>)}</option>))}</select>
+                <select className={`${inputCls} cursor-pointer`} value={filterFac} onChange={e=>setFilterFac(e.target.value)}><option value="All">All Faculty</option>{FACULTY_LIST.map(f=>(<option key={f.id} value={f.id}>{getFacultyName(f as ReturnType<typeof getFaculty>)}</option>))}</select>
               </div>
               
               <div className="flex items-center gap-2 flex-1 min-w-[130px]">
                 <span className="text-xs text-gray-400 shrink-0">Program:</span>
-                <select className={inputCls} value={filterProgram} onChange={e=>setFilterProgram(e.target.value)}><option value="All">All Programs</option><option value="BSCS">BSCS</option><option value="BSIT">BSIT</option><option value="BSIS">BSIS</option></select>
+                <select className={`${inputCls} cursor-pointer`} value={filterProgram} onChange={e=>setFilterProgram(e.target.value)}><option value="All">All Programs</option><option value="BSCS">BSCS</option><option value="BSIT">BSIT</option><option value="BSIS">BSIS</option></select>
               </div>
               
               <div className="flex items-center gap-2 flex-1 min-w-[150px]">
                 <span className="text-xs text-gray-400 shrink-0"><DoorOpen size={13} className="inline mr-1 text-gray-400"/>Room:</span>
-                <select className={inputCls} value={filterRoom} onChange={e=>setFilterRoom(e.target.value)}><option value="All">All Rooms</option>{ROOM_LIST.map(r=>(<option key={r.id} value={r.id}>{(r as any).room}</option>))}</select>
+                <select className={`${inputCls} cursor-pointer`} value={filterRoom} onChange={e=>setFilterRoom(e.target.value)}><option value="All">All Rooms</option>{ROOM_LIST.map(r=>(<option key={r.id} value={r.id}>{(r as any).room}</option>))}</select>
               </div>
               
               <div className="flex items-center gap-2 flex-1 min-w-[140px]">
                 <span className="text-xs text-gray-400 shrink-0">Status:</span>
-                <select className={inputCls} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}><option value="All">All Stages</option><option value="draft">Draft</option><option value="finalized">Finalized</option><option value="published">Published</option></select>
+                <select className={`${inputCls} cursor-pointer`} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}><option value="All">All Stages</option><option value="draft">Draft</option><option value="finalized">Finalized</option><option value="published">Published</option></select>
               </div>
               
               {/* --- NEW SORT DROPDOWN --- */}
               <div className="flex items-center gap-2 flex-1 min-w-[140px]">
                 <span className="text-xs text-gray-400 shrink-0">Sort:</span>
-                <select className={inputCls} value={sortOrder} onChange={e=>setSortOrder(e.target.value)}>
+                <select className={`${inputCls} cursor-pointer`} value={sortOrder} onChange={e=>setSortOrder(e.target.value)}>
                   <option value="subject_asc">Subject (A - Z)</option>
                   <option value="subject_desc">Subject (Z - A)</option>
                 </select>

@@ -63,7 +63,7 @@ export default function EducationModal({
               value={formData.degreeLevel}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 text-sm sm:text-base border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+              className="w-full px-3 py-2 text-sm sm:text-base border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent cursor-pointer"
             >
               <option value="">Select degree level</option>
               <option value="Bachelor">Bachelor</option>
@@ -83,7 +83,7 @@ export default function EducationModal({
                 value={formData.degreeType}
                 onChange={handleChange}
                 required
-                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent"
+                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent cursor-pointer"
               >
                 <option value="">Select degree type</option>
                 <option value="Science">Science</option>
