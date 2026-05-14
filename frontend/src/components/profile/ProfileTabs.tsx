@@ -10,7 +10,7 @@ const TABS = [
   { id: "education", label: "Education", Icon: GraduationCap },
   { id: "credentials", label: "Credentials", Icon: Award },
   { id: "research", label: "Research", Icon: BookOpen },
-  { id: "availability", label: "Availability", Icon: Clock }
+  { id: "availability", label: "Availability", Icon: Clock },
 ];
 
 export default function ProfileTabs({

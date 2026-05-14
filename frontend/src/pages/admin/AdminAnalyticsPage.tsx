@@ -248,7 +248,7 @@ export default function AdminAnalyticsPage() {
                   </div>
                   <button
                     onClick={handleReloadGender}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition whitespace-nowrap cursor-pointer"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition whitespace-nowrap cursor-pointer"
                   >
                     Retry
                   </button>
@@ -276,7 +276,7 @@ export default function AdminAnalyticsPage() {
                   </div>
                   <button
                     onClick={handleReloadEmploymentType}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition whitespace-nowrap cursor-pointer"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition whitespace-nowrap cursor-pointer"
                   >
                     Retry
                   </button>

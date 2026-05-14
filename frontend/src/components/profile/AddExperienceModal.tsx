@@ -29,10 +29,7 @@ export default function AddExperienceModal({
 
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        name.includes("Year")
-          ? parseInt(value) || 0
-          : value,
+      [name]: name.includes("Year") ? parseInt(value) || 0 : value,
     }));
   };
 
