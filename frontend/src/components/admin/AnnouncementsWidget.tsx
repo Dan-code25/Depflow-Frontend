@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { Megaphone, ArrowRight, Calendar, User, Loader2 } from "lucide-react";
+import {
+  Megaphone,
+  ArrowRight,
+  Calendar,
+  User,
+  Loader2,
+  FileText,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getDashboardAnnouncements } from "../../services/dashboardService";
 import type { Announcement } from "../../types/profile";
@@ -17,6 +24,7 @@ export function AnnouncementsWidget({
   const [announcements, setAnnouncements] =
     useState<Announcement[]>(initialAnnouncements);
   const [isLoading, setIsLoading] = useState(initialIsLoading);
+  const userRole = localStorage.getItem("user_role");
 
   useEffect(() => {
     fetchAnnouncements();
@@ -85,7 +93,7 @@ export function AnnouncementsWidget({
                                 download={attachment.filename}
                                 className="flex items-center gap-2 text-xs text-burgundy hover:text-burgundy/80 transition-colors cursor-pointer"
                               >
-                                <span>📎</span>
+                                <FileText size={12} />
                                 <span className="truncate hover:underline">
                                   {attachment.filename}
                                 </span>
@@ -124,7 +132,13 @@ export function AnnouncementsWidget({
 
           {/* View All Button */}
           <button
-            onClick={() => navigate("/admin/announcements")}
+            onClick={() => {
+              const announcementPath =
+                userRole === "admin"
+                  ? "/admin/announcements"
+                  : "/faculty/announcements";
+              navigate(announcementPath);
+            }}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-burgundy text-burgundy rounded-lg hover:bg-red-50 transition-colors font-medium text-sm"
           >
             View All Announcements

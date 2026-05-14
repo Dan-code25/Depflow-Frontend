@@ -1,4 +1,11 @@
-import { Trash2, Calendar, User, Megaphone, Edit } from "lucide-react";
+import {
+  Trash2,
+  Calendar,
+  User,
+  Megaphone,
+  Edit,
+  FileText,
+} from "lucide-react";
 import { useState } from "react";
 import type { Announcement } from "../../types/profile";
 import { ConfirmDialog } from "../common/ConfirmDialog";
@@ -98,7 +105,7 @@ export function AnnouncementCard({
                         download={attachment.filename}
                         className="flex items-center gap-2 text-sm text-burgundy hover:text-burgundy/80 transition-colors cursor-pointer"
                       >
-                        <span className="text-xs">📎</span>
+                        <FileText size={14} />
                         <span className="truncate hover:underline">
                           {attachment.filename}
                         </span>
