@@ -48,9 +48,8 @@ export default function ProfileSidebar({
   // Get load color based on percentage
   const getLoadColor = () => {
     const percentage = (currentUnits / maxUnits) * 100;
-    const isOverloaded = currentUnits > maxUnits;
 
-    if (isOverloaded || percentage > 90) {
+    if (currentUnits >= maxUnits) {
       return { bar: "bg-red-600", text: "text-red-600" };
     } else if (percentage > 70) {
       return { bar: "bg-amber-500", text: "text-amber-600" };
@@ -177,19 +176,6 @@ export default function ProfileSidebar({
                   className={`h-full rounded-full transition-all ${loadColor.bar}`}
                   style={{ width: `${Math.min(percentage, 100)}%` }}
                 />
-              </div>
-
-              {/* Status Text */}
-              <div className="text-xs text-slate-600">
-                {percentage > 90 ? (
-                  <span className="text-red-600 font-medium">Overloaded</span>
-                ) : percentage > 70 ? (
-                  <span className="text-amber-600 font-medium">High Load</span>
-                ) : (
-                  <span className="text-green-600 font-medium">
-                    Normal Load
-                  </span>
-                )}
               </div>
             </div>
           )}

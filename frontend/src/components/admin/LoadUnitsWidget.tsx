@@ -12,11 +12,10 @@ export function LoadUnitsWidget({
   isLoading = false,
 }: LoadUnitsProps) {
   const percentage = (currentUnits / maxUnits) * 100;
-  const isOverloaded = currentUnits > maxUnits;
 
   // Determine color based on load percentage
   const getLoadColor = () => {
-    if (isOverloaded || percentage > 90) {
+    if (currentUnits >= maxUnits) {
       return { bar: "bg-red-600", text: "text-red-600" };
     } else if (percentage > 70) {
       return { bar: "bg-amber-500", text: "text-amber-600" };
