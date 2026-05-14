@@ -29,7 +29,7 @@ export function FacultyStatsCard({ faculty }: FacultyStatsCardProps) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-      {stats.map((stat, index) => (
+      {stats.map((stat) => (
         <div
           key={stat.label}
           className={`rounded-lg shadow-sm border p-6 flex flex-col items-center justify-center text-center transition-shadow hover:shadow-md ${

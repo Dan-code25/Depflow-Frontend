@@ -25,7 +25,6 @@ export function FacultyHeader({
   selectedEmploymentFilter,
   onEmploymentFilterChange,
   onAddClick,
-  totalCount,
   faculty,
 }: FacultyHeaderProps) {
   return (

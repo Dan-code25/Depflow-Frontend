@@ -41,25 +41,6 @@ const createEmptyProfileData = (): ProfileData => ({
   age: undefined,
 });
 
-// Helper to convert Faculty data to ProfileData
-const convertFacultyToProfileData = (faculty: Faculty): ProfileData => ({
-  firstName: faculty.firstName,
-  lastName: faculty.lastName,
-  middleName: faculty.middleName || "",
-  birthDate: "",
-  email: faculty.email,
-  contactNumber: faculty.contactNumber,
-  employeeId: faculty.employeeId,
-  designation: faculty.designation,
-  employmentType: faculty.employmentType,
-  dateHired: faculty.dateHired,
-  city: "",
-  province: "",
-  title: "",
-  age: undefined,
-  profilePicture: faculty.profilePicture,
-});
-
 // Helper to get layout based on user role
 const getLayoutByRole = (role: string | null) => {
   return role === "admin" ? AdminLayout : FacultyLayout;

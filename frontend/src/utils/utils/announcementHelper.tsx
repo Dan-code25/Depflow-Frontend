@@ -1,5 +1,5 @@
 import { Bell, AlertCircle, Calendar, BookOpen } from "lucide-react";
-import type { AnnouncementTag, AnnouncementAudience, FilterTag } from "../types/announcement";
+import type { AnnouncementTag, AnnouncementAudience, FilterTag } from "../../types/announcement";
 
 export const TAG_STYLES: Record<
   AnnouncementTag,

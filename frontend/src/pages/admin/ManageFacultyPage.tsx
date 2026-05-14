@@ -25,7 +25,6 @@ export default function ManageFacultyPage() {
   const [selectedEmploymentFilter, setSelectedEmploymentFilter] =
     useState<EmploymentTypeFilter>("All");
   const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(true);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [facultyToDelete, setFacultyToDelete] = useState<Faculty | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -34,13 +33,10 @@ export default function ManageFacultyPage() {
   useEffect(() => {
     const fetchFaculty = async () => {
       try {
-        setIsFetching(true);
         const data = await getAllFaculty();
         setFaculty(data);
       } catch (error) {
         console.error("Failed to fetch faculty:", error);
-      } finally {
-        setIsFetching(false);
       }
     };
 

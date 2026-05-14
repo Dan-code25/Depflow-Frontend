@@ -16,19 +16,15 @@ export default function FacultyInformationPage() {
   const [selectedFilter, setSelectedFilter] = useState<CoreGroupFilter>("All");
   const [selectedEmploymentFilter, setSelectedEmploymentFilter] =
     useState<EmploymentTypeFilter>("All");
-  const [isFetching, setIsFetching] = useState(true);
 
   // Fetch faculty data on component mount
   useEffect(() => {
     const fetchFaculty = async () => {
       try {
-        setIsFetching(true);
         const data = await getAllFaculty();
         setFaculty(data);
       } catch (error) {
         console.error("Failed to fetch faculty:", error);
-      } finally {
-        setIsFetching(false);
       }
     };
 

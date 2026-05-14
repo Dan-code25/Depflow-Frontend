@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Send, X, Upload, FileX, Edit, File } from "lucide-react";
+import { Send, X, Upload, Edit, File } from "lucide-react";
 import type { Announcement } from "../../types/profile";
 
 interface AnnouncementModalProps {

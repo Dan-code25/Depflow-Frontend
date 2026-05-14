@@ -71,7 +71,12 @@ export function getUniqueDays(
 }
 
 export function getUniqueFacultyIds(data: ScheduleAssignment[]): string[] {
-  const facultyIds = new Set(data.map((s) => s.faculty_id).filter(Boolean));
+  const facultyIds = new Set(
+    data
+      .map((s) => s.faculty_id)
+      .filter((id): id is string => id !== null && id !== undefined),
+  );
+
   return Array.from(facultyIds).sort();
 }
 

@@ -15,7 +15,6 @@ interface AvailabilityTabProps {
 export default function AvailabilityTab({
   availability,
   onSave,
-  onDelete,
   isLoading = false,
   readOnly = false,
 }: AvailabilityTabProps) {

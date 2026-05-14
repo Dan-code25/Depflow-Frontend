@@ -47,6 +47,7 @@ export interface Credential {
   company?: string;
   startYear?: number;
   endYear?: number;
+  isCurrentlyWorking?: boolean;
 }
 
 export interface Research {
@@ -101,3 +102,8 @@ export interface Announcement {
     url: string;
   }>;
 }
+
+export type DayTimeRange = {
+  startTime: string;
+  endTime: string;
+};

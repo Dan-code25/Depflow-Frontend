@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import type { Availability } from "../../types/profile";
-import { DAYS_OF_WEEK } from "../../utils/availabilityConstants";
 import { getSubjects } from "../../services/availabilityService";
 import type { Subject } from "../../utils/availabilityConstants";
 

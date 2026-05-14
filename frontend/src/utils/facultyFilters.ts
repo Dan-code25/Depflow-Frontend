@@ -1,5 +1,3 @@
-import type { CoreGroupFilter, EmploymentTypeFilter } from "../types/faculty";
-
 export function getFilterButtonClass(isSelected: boolean): string {
   return `px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
     isSelected
