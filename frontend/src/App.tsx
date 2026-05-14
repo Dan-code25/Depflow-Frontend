@@ -5,7 +5,7 @@ import NotFound from "./pages/NotFound";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import AdminDashboard from "./components/admin/AdminDashboard";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 import FacultyDashboard from "./components/faculty/FacultyDashboard";
 import MyProfile from "./pages/profile/MyProfile";
 import AdminAnnouncementsPage from "./pages/admin/AdminAnnouncementsPage";
@@ -45,10 +45,11 @@ function AppRoutes() {
         <Route path="/admin/manage-faculty" element={<ManageFacultyPage />} />
         <Route path="/admin/faculty/:id" element={<FacultyProfileViewPage />} />
         <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
-        <Route path="/admin/manage-schedule" element={<AdminManageSchedule />} />
+        <Route
+          path="/admin/manage-schedule"
+          element={<AdminManageSchedule />}
+        />
         <Route path="/admin/my-schedule" element={<MySchedule />} />
-
-
       </Route>
 
       <Route element={<ProtectedRoute requiredRole="faculty" />}>
