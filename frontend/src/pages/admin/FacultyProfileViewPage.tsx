@@ -39,6 +39,7 @@ const createEmptyProfileData = (): ProfileData => ({
   province: "",
   title: "",
   age: undefined,
+  gender: "",
 });
 
 // Helper to get layout based on user role
@@ -126,6 +127,7 @@ export default function FacultyProfileViewPage() {
         profilePicture: profilePictureUrl || faculty.profilePicture,
         birthDate: faculty.birthDate || "",
         age: faculty.age,
+        gender: faculty.gender || "",
         city: faculty.city || "",
         province: faculty.province || "",
         title: faculty.title || "",
