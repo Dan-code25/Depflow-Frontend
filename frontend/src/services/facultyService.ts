@@ -43,10 +43,7 @@ export const addFaculty = async (facultyData: AddFacultyFormData) => {
     const backendData = mapToBackendFaculty(facultyData);
     console.log("Backend data to send:", backendData);
 
-    const response = await api.post(
-      "/faculty/add-faculty",
-      backendData,
-    );
+    const response = await api.post("/faculty/add-faculty", backendData);
     // Map backend response to frontend format
     return mapBackendFaculty(response.data);
   } catch (error) {
@@ -61,5 +58,22 @@ export const deleteFaculty = async (facultyId: string) => {
   } catch (error) {
     console.error("Error deleting faculty:", error);
     throw error;
+  }
+};
+
+export const getFacultyLoadUnits = async (facultyId: string) => {
+  try {
+    const response = await api.get(`/faculty/load-units/${facultyId}`);
+    console.log("Load units response:", response.data);
+    return {
+      currentUnits: response.data?.currentUnits || 0,
+      maxUnits: response.data?.maxUnits || 24,
+    };
+  } catch (error) {
+    console.error("Error fetching faculty load units:", error);
+    return {
+      currentUnits: 0,
+      maxUnits: 24,
+    };
   }
 };

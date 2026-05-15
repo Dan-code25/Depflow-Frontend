@@ -2,18 +2,21 @@ import type { ProfileData } from "../../types/profile";
 import { Mail, Phone, Briefcase, Clock, Camera, Zap } from "lucide-react";
 import profilePlaceholder from "../../assets/profile-placeholder.svg";
 import { useState, useEffect } from "react";
+import { getFacultyLoadUnits } from "../../services/facultyService";
 import { getLoadUnits } from "../../services/dashboardService";
 
 interface ProfileSidebarProps {
   data: ProfileData;
   onProfilePictureChange?: (file: File) => void;
   readOnly?: boolean;
+  facultyId?: string;
 }
 
 export default function ProfileSidebar({
   data,
   onProfilePictureChange,
   readOnly = false,
+  facultyId,
 }: ProfileSidebarProps) {
   const [currentUnits, setCurrentUnits] = useState<number>(0);
   const [maxUnits, setMaxUnits] = useState<number>(24);
@@ -23,9 +26,17 @@ export default function ProfileSidebar({
     const fetchLoadUnits = async () => {
       try {
         setIsLoadingUnits(true);
-        const data = await getLoadUnits();
-        setCurrentUnits(data.currentUnits);
-        setMaxUnits(data.maxUnits);
+        if (facultyId) {
+          // Fetch load units for the viewed faculty member
+          const loadUnitsData = await getFacultyLoadUnits(facultyId);
+          setCurrentUnits(loadUnitsData.currentUnits);
+          setMaxUnits(loadUnitsData.maxUnits);
+        } else {
+          // Fetch load units for the current user (my profile)
+          const loadUnitsData = await getLoadUnits();
+          setCurrentUnits(loadUnitsData.currentUnits);
+          setMaxUnits(loadUnitsData.maxUnits);
+        }
       } catch (error) {
         console.error("Error fetching load units:", error);
         setCurrentUnits(0);
@@ -36,7 +47,7 @@ export default function ProfileSidebar({
     };
 
     fetchLoadUnits();
-  }, []);
+  }, [facultyId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

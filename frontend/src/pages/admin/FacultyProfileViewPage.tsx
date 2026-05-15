@@ -174,6 +174,7 @@ export default function FacultyProfileViewPage() {
             <div className="lg:col-span-1">
               <ProfileSidebar
                 data={profileData}
+                facultyId={id}
                 onProfilePictureChange={() => {}}
                 readOnly={true}
               />
