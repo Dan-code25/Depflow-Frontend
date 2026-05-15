@@ -19,4 +19,5 @@ export const DESIGNATIONS = [
   "Guest Lecturer",
   "Instructor",
 ] as const;
+export const GENDER_OPTIONS = ["Male", "Female"] as const;
 

@@ -65,6 +65,7 @@ export default function MyProfile() {
     province: "",
     title: "",
     age: undefined,
+    gender: "",
   });
   const [educations, setEducations] = useState<Education[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -346,6 +347,7 @@ export default function MyProfile() {
           province: data.province,
           title: data.title,
           age: data.age,
+          gender: data.gender ?? "",
         }));
       } catch (error) {
         console.error("Failed to fetch profile data:", error);

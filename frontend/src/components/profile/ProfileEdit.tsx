@@ -97,6 +97,14 @@ export default function ProfileEdit({
           onChange={handleChange}
         />
         <FormField
+          label="Gender"
+          name="gender"
+          placeholder="Gender"
+          value={data.gender || ""}
+          onChange={handleChange}
+          isReadOnly={true}
+        />
+        <FormField
           label="Age"
           name="age"
           type="number"

@@ -5,6 +5,7 @@ import {
   CORE_GROUPS,
   EMPLOYMENT_TYPES,
   DESIGNATIONS,
+  GENDER_OPTIONS,
 } from "../../constants/faculty";
 
 interface AddFacultyModalProps {
@@ -19,6 +20,7 @@ const INITIAL_FORM_DATA: AddFacultyFormData = {
   firstName: "",
   lastName: "",
   middleName: "",
+  gender: "",
   contactNumber: "",
   coreGroup: "IT CORE",
   employmentType: "Full-Time",
@@ -79,6 +81,10 @@ export function AddFacultyModal({
       newErrors.contactNumber = "Contact number is required";
     }
 
+    if (!formData.gender.trim()) {
+      newErrors.gender = "Gender is required";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -120,6 +126,7 @@ export function AddFacultyModal({
     formData.firstName.trim() &&
     formData.lastName.trim() &&
     formData.contactNumber.trim() &&
+    formData.gender.trim() &&
     formData.employeeId.trim() &&
     formData.dateHired &&
     formData.designation.trim();
@@ -250,32 +257,64 @@ export function AddFacultyModal({
             </div>
           </div>
 
-          {/* Contact Number Row */}
-          <div>
-            <label
-              htmlFor="contactNumber"
-              className="block text-sm font-semibold text-slate-700 mb-2"
-            >
-              Contact Number *
-            </label>
-            <input
-              id="contactNumber"
-              type="tel"
-              name="contactNumber"
-              value={formData.contactNumber}
-              onChange={handleInputChange}
-              placeholder="09XXXXXXXXX"
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent transition ${
-                errors.contactNumber
-                  ? "border-red-500 bg-red-50"
-                  : "border-slate-300"
-              }`}
-            />
-            {errors.contactNumber && (
-              <p className="text-red-600 text-xs mt-1">
-                {errors.contactNumber}
-              </p>
-            )}
+          {/* Contact Number and Gender Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="contactNumber"
+                className="block text-sm font-semibold text-slate-700 mb-2"
+              >
+                Contact Number *
+              </label>
+              <input
+                id="contactNumber"
+                type="tel"
+                name="contactNumber"
+                value={formData.contactNumber}
+                onChange={handleInputChange}
+                placeholder="09XXXXXXXXX"
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent transition ${
+                  errors.contactNumber
+                    ? "border-red-500 bg-red-50"
+                    : "border-slate-300"
+                }`}
+              />
+              {errors.contactNumber && (
+                <p className="text-red-600 text-xs mt-1">
+                  {errors.contactNumber}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="gender"
+                className="block text-sm font-semibold text-slate-700 mb-2"
+              >
+                Gender *
+              </label>
+              <select
+                id="gender"
+                name="gender"
+                value={formData.gender}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-burgundy focus:border-transparent transition cursor-pointer ${
+                  errors.gender
+                    ? "border-red-500 bg-red-50"
+                    : "border-slate-300"
+                }`}
+              >
+                <option value="">Select gender...</option>
+                {GENDER_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+              {errors.gender && (
+                <p className="text-red-600 text-xs mt-1">{errors.gender}</p>
+              )}
+            </div>
           </div>
 
           {/* Third Row: Core Group and Employment Type */}

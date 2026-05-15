@@ -25,6 +25,7 @@ export interface AddFacultyFormData {
   firstName: string;
   lastName: string;
   middleName: string;
+  gender: string;
   contactNumber: string;
   coreGroup: "IT CORE" | "CS CORE" | "IS CORE" | "General Education";
   employmentType: "Full-Time" | "Part-Time" | "Full-Time Part-Time";

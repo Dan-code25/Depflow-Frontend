@@ -33,7 +33,7 @@ interface ProfileViewProps {
   readOnly?: boolean;
 }
 
-const InfoField = ({ label, value }: { label: string; value: string }) => (
+const InfoField = ({ label, value }: { label: string; value?: string }) => (
   <div>
     <label className="text-xs font-bold text-slate-500 uppercase block">
       {label}
@@ -148,6 +148,7 @@ export default function ProfileView({
           <InfoField label="First Name" value={data.firstName} />
           <InfoField label="Last Name" value={data.lastName} />
           <InfoField label="Middle Name" value={data.middleName} />
+          <InfoField label="Gender" value={data.gender} />
           <InfoField label="Age" value={data.age?.toString() || ""} />
           <InfoField label="Birth Date" value={data.birthDate} />
           <InfoField label="Email" value={data.email} />

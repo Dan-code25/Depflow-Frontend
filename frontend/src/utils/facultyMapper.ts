@@ -94,6 +94,7 @@ export function mapToBackendFaculty(data: any) {
     last_name: data.lastName,
     middle_name: data.middleName || null,
     contact_number: data.contactNumber,
+    gender: data.gender,
     core_group: data.coreGroup,
     employment_type: data.employmentType,
     employee_id: data.employeeId,
