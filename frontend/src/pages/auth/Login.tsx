@@ -1,4 +1,4 @@
-import { Info } from "lucide-react";
+import { Info, X } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -107,9 +107,10 @@ export default function Login() {
                 </p>
                 <button
                   onClick={() => setError(null)}
-                  className="text-red-500 hover:text-red-700 font-semibold text-lg leading-none"
+                  className="text-red-500 hover:text-red-700 font-semibold leading-none"
+                  aria-label="Dismiss error message"
                 >
-                  ✕
+                  <X size={18} />
                 </button>
               </div>
             )}
