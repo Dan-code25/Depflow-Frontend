@@ -148,12 +148,20 @@ export default function AvailabilityForm({
   };
 
   const handleDayToggle = (day: string, type: "preferred" | "unavailable") => {
-    const field = type === "preferred" ? "preferredDays" : "unavailableDays";
     setFormData((prev) => ({
       ...prev,
-      [field]: prev[field].includes(day)
-        ? prev[field].filter((d) => d !== day)
-        : [...prev[field], day],
+      preferredDays:
+        type === "preferred"
+          ? prev.preferredDays.includes(day)
+            ? prev.preferredDays.filter((d) => d !== day)
+            : [...prev.preferredDays, day]
+          : prev.preferredDays.filter((d) => d !== day),
+      unavailableDays:
+        type === "unavailable"
+          ? prev.unavailableDays.includes(day)
+            ? prev.unavailableDays.filter((d) => d !== day)
+            : [...prev.unavailableDays, day]
+          : prev.unavailableDays.filter((d) => d !== day),
     }));
     setErrors([]);
   };
@@ -527,9 +535,18 @@ export default function AvailabilityForm({
                     type="checkbox"
                     checked={formData.preferredDays.includes(day)}
                     onChange={() => handleDayToggle(day, "preferred")}
+                    disabled={formData.unavailableDays.includes(day)}
                     className="w-4 h-4 text-burgundy border-slate-200 rounded focus:ring-2 focus:ring-burgundy"
                   />
-                  <span className="text-sm text-slate-700">{day}</span>
+                  <span
+                    className={`text-sm ${
+                      formData.unavailableDays.includes(day)
+                        ? "text-slate-400"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    {day}
+                  </span>
                 </label>
               ))}
             </div>
@@ -550,9 +567,18 @@ export default function AvailabilityForm({
                     type="checkbox"
                     checked={formData.unavailableDays.includes(day)}
                     onChange={() => handleDayToggle(day, "unavailable")}
+                    disabled={formData.preferredDays.includes(day)}
                     className="w-4 h-4 text-burgundy border-slate-200 rounded focus:ring-2 focus:ring-burgundy"
                   />
-                  <span className="text-sm text-slate-700">{day}</span>
+                  <span
+                    className={`text-sm ${
+                      formData.preferredDays.includes(day)
+                        ? "text-slate-400"
+                        : "text-slate-700"
+                    }`}
+                  >
+                    {day}
+                  </span>
                 </label>
               ))}
             </div>
