@@ -121,7 +121,7 @@ export async function enrichConflictsWithGemini(
   const prompt = buildPrompt(enrichContext);
 
   const response = await fetch(GEMINI_API_URL, {
-    method: "GET",
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
@@ -529,7 +529,7 @@ export async function validateFullScheduleAdherence(context: GeminiScheduleConte
   `;
 
   const response = await fetch(GEMINI_API_URL, {
-    method: "GET",
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
