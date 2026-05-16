@@ -84,8 +84,7 @@ export interface ValidationContext extends GeminiScheduleContext {
 }
 
 
-const GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
-const GEMINI_API_URL = `/api/gemini/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL;
 
 export async function enrichConflictsWithGemini(
   context: GeminiScheduleContext,
@@ -120,19 +119,12 @@ export async function enrichConflictsWithGemini(
 
   const prompt = buildPrompt(enrichContext);
 
-  const response = await fetch(GEMINI_API_URL, {
+  const response = await fetch(BACKEND_API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        // Force JSON output — supported by Gemini 2.0 Flash
-        responseMimeType: "application/json",
-        temperature: 0.7,      // Low temp = consistent, factual suggestions
-        maxOutputTokens: 16000, // Must be high — conflict IDs contain full Date.now()
-                               // timestamps (19-char strings). With 4+ conflicts and
-                               // long suggestions, 4096 can still truncate. 8192 is safe.
-      },
+      prompt: prompt,
+      isJsonMode: false // Tells backend we want text formatting
     }),
   });
 
@@ -397,34 +389,33 @@ function validateSuggestion(
   suggestion: GeminiConflictSuggestion,
   vCtx: ValidationContext
 ): boolean {
-  // If no validation context provided, skip validation (backward compatible)
   if (!vCtx) return true;
 
   console.log(`[DeptFlow] Validating suggestion for conflict: ${suggestion.conflictId}`);
 
-  // Parse the suggestion text to extract the action
   const suggestionText = suggestion.suggestion.toLowerCase();
 
-  // ── VALIDATION RULE 1: Faculty reassignment suggestions ──────────────────
-  // Pattern: "move X to Dr. Y" or "assign X to Dr. Y" or "transfer X to Dr. Y"
+  // 🛠️ FIXED: Made the "(3u)" unit string optional so the parser doesn't break
+  // if Gemini forgets to include it.
   const facultyReassignmentMatch = suggestionText.match(
-    /transfer\s+(\w+(?:-\w+)?)\s+\((\d+)u\)\s+from\s+(.+?)\s+to\s+(.+?)(?:\.|,|$)/i
+    /transfer\s+([a-zA-Z0-9-]+)(?:\s*\(\d+u\))?\s+from\s+(.+?)\s+to\s+(.+?)(?:\.|,|$)/i
   );
 
   if (facultyReassignmentMatch) {
     let subjectCode = facultyReassignmentMatch[1].toUpperCase();
-  // Handle common patterns: cs251l-m → CS251L-M
     subjectCode = subjectCode
-      .replace(/([A-Z]+\d+)l(-m)$/i, '$1L$2')  // xxx...l-m → xxxL-M
-      .replace(/([A-Z]+\d+)l(-h)$/i, '$1L$2')  // xxx...l-h → xxxL-H
+      .replace(/([A-Z]+\d+)l(-m)$/i, '$1L$2')  
+      .replace(/([A-Z]+\d+)l(-h)$/i, '$1L$2')  
       .toUpperCase();
     
-    const targetName = facultyReassignmentMatch[4]
+    // 🛠️ FIXED: Shifted from index 4 to index 3 based on the new regex structure
+    const targetName = facultyReassignmentMatch[3]
       .split('(')[0]
       .trim()
       .toLowerCase();
+      
     const targetFaculty = vCtx.allFaculty.find(
-      f => `${f.personal.first_name} ${f.personal.last_name}`.toLowerCase().includes(targetName.toLowerCase())
+      f => `${f.personal.first_name} ${f.personal.last_name}`.toLowerCase().includes(targetName)
     );
 
     if (!targetFaculty) {
@@ -438,7 +429,6 @@ function validateSuggestion(
       return false;
     }
 
-    // CHECK 1: Can the target faculty teach this subject?
     const targetPrefs = targetFaculty.preferences ?? {};
     const canTeach = !targetPrefs.subjectSpecializations ||
       targetPrefs.subjectSpecializations.length === 0 ||
@@ -447,16 +437,14 @@ function validateSuggestion(
     if (!canTeach && targetPrefs.subjectSpecializations && targetPrefs.subjectSpecializations.length > 0) {
       console.warn(
         `[DeptFlow] ✗ ${targetFaculty.personal.first_name} ${targetFaculty.personal.last_name} ` +
-        `cannot teach ${subjectCode} (specializations: ${targetPrefs.subjectSpecializations.join(", ")})`
+        `cannot teach ${subjectCode}`
       );
       return false;
     }
 
-    // CHECK 2: Does target faculty have capacity?
     const currentLoad = vCtx.allSchedules
       .filter(s => s.faculty_id === targetFaculty.id && s.day !== "TBD")
       .filter((s, _, arr) => {
-        // For split sessions, count only once
         if (!s.session_group_id) return true;
         return arr.findIndex(x => x.session_group_id === s.session_group_id) === arr.indexOf(s);
       })
@@ -471,19 +459,15 @@ function validateSuggestion(
     if (projectedLoad > maxLoad) {
       console.warn(
         `[DeptFlow] ✗ ${targetFaculty.personal.first_name} ${targetFaculty.personal.last_name} ` +
-        `would exceed capacity: ${projectedLoad}/${maxLoad}u (adding ${subject.units}u to current ${currentLoad}u)`
+        `would exceed capacity: ${projectedLoad}/${maxLoad}u`
       );
       return false;
     }
 
-    console.log(
-      `[DeptFlow] ✓ Suggestion valid: ${targetFaculty.personal.first_name} ${targetFaculty.personal.last_name} ` +
-      `can take ${subjectCode} (capacity: ${projectedLoad}/${maxLoad}u)`
-    );
+    console.log(`[DeptFlow] ✓ Suggestion valid!`);
     return true;
   }
 
-  // ── VALIDATION RULE 2: Time/Room change suggestions ──────────────────────
   const timeRoomMatch = suggestionText.match(/(?:move|change|schedule|assign).*(?:to|on)\s+(.+?)(?:\.|,|$)/i);
   if (timeRoomMatch) {
     const targetSlot = timeRoomMatch[1].trim();
@@ -491,7 +475,6 @@ function validateSuggestion(
     return true;
   }
 
-  // ── VALIDATION RULE 3: Generic suggestions (no specific action detected) ──
   console.warn(`[DeptFlow] ✗ Could not parse actionable suggestion: ${suggestion.suggestion}`);
   return false;
 }
@@ -528,12 +511,12 @@ export async function validateFullScheduleAdherence(context: GeminiScheduleConte
     4. Keep the tone professional, authoritative, and concise. Group similar errors together rather than listing every single one.
   `;
 
-  const response = await fetch(GEMINI_API_URL, {
+  const response = await fetch(BACKEND_API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1 }, 
+      prompt: prompt,
+      isJsonMode: false // Tells backend we want text formatting
     }),
   });
 
