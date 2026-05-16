@@ -121,7 +121,7 @@ export async function enrichConflictsWithGemini(
   const prompt = buildPrompt(enrichContext);
 
   const response = await fetch(GEMINI_API_URL, {
-    method: "POST",
+    method: "GET",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
