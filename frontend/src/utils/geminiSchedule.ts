@@ -529,7 +529,7 @@ export async function validateFullScheduleAdherence(context: GeminiScheduleConte
   `;
 
   const response = await fetch(GEMINI_API_URL, {
-    method: "POST",
+    method: "GET",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
