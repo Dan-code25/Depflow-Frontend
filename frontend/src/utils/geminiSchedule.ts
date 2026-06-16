@@ -85,12 +85,15 @@ export interface ValidationContext extends GeminiScheduleContext {
 
 
 const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL;
+console.log('[DeptFlow] Gemini URL:', BACKEND_API_URL);
 
 export async function enrichConflictsWithGemini(
   context: GeminiScheduleContext,
   validationContext?: ValidationContext
 ): Promise<GeminiConflictSuggestion[]> {
-
+  if (!BACKEND_API_URL) {
+    throw new Error("[DeptFlow] VITE_BACKEND_API_URL is not set. Check your .env and restart Vite.");
+  }
   // Pre-filter: remove conflict types that Gemini should never touch because
   // they are either auto-fixed by the local engine or are valid by exception.
   // Passing them to Gemini risks getting back incorrect "suggestions".
