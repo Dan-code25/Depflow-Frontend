@@ -17,6 +17,12 @@
 
 import type { ScheduleAssignment } from "./geminiSchedHelper";
 import { isExternalSubject } from "./scheduleConflict";
+
+// ─── FIX: Import the shared api service instead of using fetch() directly.
+// This routes Gemini calls through the same Axios instance used everywhere
+// else in the app, so no VITE_BACKEND_API_URL env var is needed on the client.
+import api from "../services/api";
+
 // ─────────────────────────────────────────────────────────────────────────────
 export interface GeminiConflictSuggestion {
   conflictId: string;
@@ -83,23 +89,22 @@ export interface ValidationContext extends GeminiScheduleContext {
   }>;
 }
 
-
-const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL;
-console.log('[DeptFlow] Gemini URL:', BACKEND_API_URL);
+// ─── FIX: Removed `const BACKEND_API_URL = import.meta.env.VITE_BACKEND_API_URL`
+// That line was the root cause — the env var was undefined at runtime, causing
+// fetch(undefined) → POST http://localhost:5173/admin/undefined (404).
+// All Gemini calls now go through api.post('/api/gemini', ...) instead.
 
 export async function enrichConflictsWithGemini(
   context: GeminiScheduleContext,
   validationContext?: ValidationContext
 ): Promise<GeminiConflictSuggestion[]> {
-  if (!BACKEND_API_URL) {
-    throw new Error("[DeptFlow] VITE_BACKEND_API_URL is not set. Check your .env and restart Vite.");
-  }
+
   // Pre-filter: remove conflict types that Gemini should never touch because
   // they are either auto-fixed by the local engine or are valid by exception.
   // Passing them to Gemini risks getting back incorrect "suggestions".
   const filteredConflicts = context.detectedConflicts.filter(c => {
     // Check if any affected assignment involves an external subject (GE/PE/NSTP)
-    const involvesExternal = c.affected.some((id: string) => { // 🚩 FIX: Added explicit string type
+    const involvesExternal = c.affected.some((id: string) => {
       const assignment = context.schedules.find(s => s.id === id);
       return assignment && isExternalSubject(assignment.subjectCode);
     });
@@ -107,7 +112,6 @@ export async function enrichConflictsWithGemini(
     if (involvesExternal) return false;
 
     // Filter out conflicts already handled by deterministic local fixes
-    // 🚩 FIX: Changed 'prefix' to 'pre' to match the iterator variable
     if (["labhr-", "nstp-day-", "lablec-", "room-", "time-", "tbd-fac-", "tbd-room-"].some((pre: string) => c.id.startsWith(pre))) {
       return false;
     }
@@ -122,23 +126,22 @@ export async function enrichConflictsWithGemini(
 
   const prompt = buildPrompt(enrichContext);
 
-  const response = await fetch(BACKEND_API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt: prompt,
-      isJsonMode: false // Tells backend we want text formatting
-    }),
+  // ─── FIX: was `fetch(BACKEND_API_URL, { method: "POST", ... })`
+  // Now routes through the api service (Axios) — same base URL as all other calls.
+  const response = await api.post("/gemini", {
+    prompt: prompt,
+    isJsonMode: false, // Tells backend we want text formatting
   });
 
-
-  const data = await response.json();
+  // ─── FIX: Axios wraps the response body in `.data`, so use response.data
+  // instead of calling response.json(). The shape (candidates[...].text) stays
+  // the same — your backend proxies the raw Gemini response through unchanged.
+  const data = response.data;
   const rawText: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
   const suggestions = parseGeminiResponse(rawText);
 
-
-  // ── NEW: Pre-flight validation (Phase 2) ────────────────────────────────
+  // ── Pre-flight validation (Phase 2) ────────────────────────────────────────
   if (validationContext) {
     const validated = suggestions.filter(sugg => validateSuggestion(sugg, validationContext));
     return validated;
@@ -514,15 +517,13 @@ export async function validateFullScheduleAdherence(context: GeminiScheduleConte
     4. Keep the tone professional, authoritative, and concise. Group similar errors together rather than listing every single one.
   `;
 
-  const response = await fetch(BACKEND_API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt: prompt,
-      isJsonMode: false // Tells backend we want text formatting
-    }),
+  // ─── FIX: was `fetch(BACKEND_API_URL, { method: "POST", ... })`
+  // Now routes through the api service — same fix as enrichConflictsWithGemini above.
+  const response = await api.post("/gemini", {
+    prompt: prompt,
+    isJsonMode: false, // Tells backend we want text formatting
   });
 
-  const data = await response.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "Could not generate audit report.";
+  // ─── FIX: Axios wraps response body in `.data`, so use response.data directly.
+  return response.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "Could not generate audit report.";
 }
